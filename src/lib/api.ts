@@ -79,6 +79,9 @@ export const menuApi = {
     api<Product[]>("/menu/products", { params }),
   getProduct: (id: string) => api<Product>(`/menu/products/${id}`),
   getSupplements: () => api<Supplement[]>("/menu/supplements"),
+  getSignatures: () => api<Product[]>("/menu/signatures"),
+  getAdvice: () => api<Product[]>("/menu/advice"),
+  getShopSettings: () => api<ShopSettings>("/menu/shop-settings"),
 };
 
 export const profileApi = {
@@ -134,6 +137,12 @@ export type Product = {
   is_active: boolean;
   product_variants: ProductVariant[];
   product_supplements: { supplement_id: string; supplements: Supplement }[];
+};
+
+export type ShopSettings = {
+  open_days: string;
+  open_hours: string;
+  updated_at: string;
 };
 
 export type ProfileData = {

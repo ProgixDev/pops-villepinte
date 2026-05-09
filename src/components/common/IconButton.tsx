@@ -48,11 +48,13 @@ export default function IconButton({
         pressScale.value = withTiming(1, { duration: 160 });
       }}
       hitSlop={8}
-      className={`items-center justify-center rounded-full ${
-        isLight ? "bg-surface-container-lowest" : "bg-on-surface"
-      }`}
+      className="items-center justify-center rounded-full"
       style={[
-        { width: size, height: size },
+        {
+          width: size,
+          height: size,
+          backgroundColor: isLight ? colors.surface : colors.ink,
+        },
         isLight ? shadow.card : null,
         animatedStyle,
       ]}

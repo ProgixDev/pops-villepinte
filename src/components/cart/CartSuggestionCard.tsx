@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { colors, shadow } from "@/constants/theme";
+import { colors } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
 import type { Product } from "@/types";
@@ -67,7 +67,7 @@ export default function CartSuggestionCard({
         cardScale.value = withTiming(1, { duration: 160 });
       }}
       className="bg-surface-container-lowest rounded-xl overflow-hidden"
-      style={[{ width: 140 }, shadow.card, cardStyle]}
+      style={[{ width: 140 }, cardStyle]}
     >
       <View style={{ height: 100 }}>
         <Image
@@ -117,10 +117,13 @@ export default function CartSuggestionCard({
               addScale.value = withTiming(1, { duration: 160 });
             }}
             hitSlop={6}
-            className="bg-on-surface items-center justify-center rounded-full"
-            style={[{ width: 28, height: 28 }, addStyle]}
+            className="items-center justify-center rounded-full"
+            style={[
+              { width: 28, height: 28, backgroundColor: colors.primary },
+              addStyle,
+            ]}
           >
-            <Plus size={14} color={colors.surface} strokeWidth={2.5} />
+            <Plus size={14} color={colors.ink} strokeWidth={2.5} />
           </AnimatedPressable>
         </View>
       </View>

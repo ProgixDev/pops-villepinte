@@ -24,9 +24,8 @@ export class MenuService {
     let qb = this.supabase
       .from('products')
       .select(
-        '*, product_variants(*), product_supplements(supplement_id, supplements(*))',
+        '*, image_url:image_path, product_variants(*), product_supplements(supplement_id, supplements(*))',
       )
-      .eq('is_active', true)
       .eq('is_available', true);
 
     if (query.category_id) {
@@ -48,7 +47,7 @@ export class MenuService {
     const { data, error } = await this.supabase
       .from('products')
       .select(
-        '*, product_variants(*), product_supplements(supplement_id, supplements(*))',
+        '*, image_url:image_path, product_variants(*), product_supplements(supplement_id, supplements(*))',
       )
       .eq('id', id)
       .single();
@@ -66,5 +65,50 @@ export class MenuService {
 
     if (error) throw error;
     return data;
+  }
+
+  async getSignatures() {
+    return this.getCuratedProducts('home_signatures');
+  }
+
+  async getAdvice() {
+    return this.getCuratedProducts('home_advice');
+  }
+
+  async getShopSettings() {
+    const { data, error } = await this.supabase
+      .from('shop_settings')
+      .select('open_days, open_hours, updated_at')
+      .eq('id', 1)
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  private async getCuratedProducts(table: 'home_signatures' | 'home_advice') {
+    const { data: rows, error: rowsError } = await this.supabase
+      .from(table)
+      .select('product_id, position')
+      .order('position', { ascending: true });
+
+    if (rowsError) throw rowsError;
+    if (!rows || rows.length === 0) return [];
+
+    const ids = rows.map((r) => r.product_id);
+    const { data: products, error: productsError } = await this.supabase
+      .from('products')
+      .select(
+        '*, image_url:image_path, product_variants(*), product_supplements(supplement_id, supplements(*))',
+      )
+      .in('id', ids)
+      .eq('is_available', true);
+
+    if (productsError) throw productsError;
+
+    const byId = new Map((products ?? []).map((p: any) => [p.id, p]));
+    return rows
+      .map((r) => byId.get(r.product_id))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p));
   }
 }

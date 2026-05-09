@@ -13,7 +13,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed:menu": "ts-node -r tsconfig-paths/register src/modules/seed/seed.bootstrap.ts"
+    "seed:menu": "ts-node -r tsconfig-paths/register src/modules/seed/seed.bootstrap.ts seed:menu",
+    "seed:admin": "ts-node -r tsconfig-paths/register src/modules/seed/seed.bootstrap.ts seed:admin"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",

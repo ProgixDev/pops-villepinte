@@ -7,6 +7,8 @@ type MenuState = {
   categories: Category[];
   products: Product[];
   supplements: Supplement[];
+  signatures: Product[];
+  advice: Product[];
   loading: boolean;
   error: string | null;
   fetchMenu: () => Promise<void>;
@@ -20,21 +22,28 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
   categories: [],
   products: [],
   supplements: [],
+  signatures: [],
+  advice: [],
   loading: false,
   error: null,
 
   fetchMenu: async () => {
     set({ loading: true, error: null });
     try {
-      const [categories, products, supplements] = await Promise.all([
-        menuApi.getCategories(),
-        menuApi.getProducts(),
-        menuApi.getSupplements(),
-      ]);
+      const [categories, products, supplements, signaturesResult, adviceResult] =
+        await Promise.all([
+          menuApi.getCategories(),
+          menuApi.getProducts(),
+          menuApi.getSupplements(),
+          menuApi.getSignatures().catch(() => [] as unknown[]),
+          menuApi.getAdvice().catch(() => [] as unknown[]),
+        ]);
       set({
         categories: categories as unknown as Category[],
         products: products as unknown as Product[],
         supplements: supplements as unknown as Supplement[],
+        signatures: signaturesResult as unknown as Product[],
+        advice: adviceResult as unknown as Product[],
         loading: false,
       });
     } catch (e: unknown) {

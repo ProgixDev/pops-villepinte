@@ -9,6 +9,12 @@ import {
 } from 'class-validator';
 
 export class CreateCategoryDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(50)
+  id?: string;
+
   @IsString()
   @MinLength(1)
   @MaxLength(50)

@@ -19,6 +19,11 @@ const envSchema = z.object({
     .union([z.boolean(), z.string()])
     .transform((v) => v === true || v === 'true' || v === '1')
     .default(false),
+
+  // Bootstrap-only credentials read by `seed:admin` to provision the super-admin
+  // in Supabase Auth. After provisioning, Supabase owns the password.
+  SUPER_ADMIN_EMAIL: z.string().email().optional(),
+  SUPER_ADMIN_PASSWORD: z.string().min(8).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

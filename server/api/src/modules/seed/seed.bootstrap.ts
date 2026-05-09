@@ -5,6 +5,7 @@ import { configuration } from '../../config/configuration';
 import { validateEnv } from '../../config/env.validation';
 import { SupabaseModule } from '../../common/supabase/supabase.module';
 import { SeedCommand } from './seed.command';
+import { SeedAdminCommand } from './seed-admin.command';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { SeedCommand } from './seed.command';
     }),
     SupabaseModule,
   ],
-  providers: [SeedCommand],
+  providers: [SeedCommand, SeedAdminCommand],
 })
 class SeedAppModule {}
 

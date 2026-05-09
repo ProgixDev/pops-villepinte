@@ -9,9 +9,15 @@ import {
 } from 'class-validator';
 
 export class CreateSupplementDto {
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  @MaxLength(50)
+  @MaxLength(60)
+  id?: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(60)
   name: string;
 
   @IsNumber()

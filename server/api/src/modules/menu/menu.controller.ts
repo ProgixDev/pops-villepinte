@@ -27,4 +27,19 @@ export class MenuController {
   getSupplements() {
     return this.menuService.getSupplements();
   }
+
+  @Get('signatures')
+  getSignatures() {
+    return this.menuService.getSignatures();
+  }
+
+  @Get('advice')
+  getAdvice() {
+    return this.menuService.getAdvice();
+  }
+
+  @Get('shop-settings')
+  getShopSettings() {
+    return this.menuService.getShopSettings();
+  }
 }

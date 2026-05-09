@@ -8,7 +8,10 @@
       "mcp__claude_ai_Supabase__list_tables",
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx nest:*)"
+      "Bash(npx nest:*)",
+      "Bash(node *)",
+      "Bash(curl -sI \"https://ggjyxkofthmnwyjauwgd.supabase.co/storage/v1/object/public/product-images/box_familiale.png\")",
+      "Bash(npm run *)"
     ]
   },
   "enableAllProjectMcpServers": true,

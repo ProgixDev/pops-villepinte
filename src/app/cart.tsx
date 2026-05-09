@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
+import { ChevronLeft } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import Animated, { LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,6 +25,7 @@ export default function CartScreen(): React.ReactElement {
   const items = useCartStore((s) => s.items);
   const total = useCartStore((s) => s.totalEUR());
   const PRODUCTS = useMenuStore((s) => s.products);
+  const ADVICE = useMenuStore((s) => s.advice);
 
   const [toastVisible, setToastVisible] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string>("");
@@ -36,9 +37,9 @@ export default function CartScreen(): React.ReactElement {
 
   const suggestions = useMemo(() => {
     const inCart = new Set(items.map((i) => i.productId));
-    const pool = PRODUCTS.filter((p) => !inCart.has(p.id));
-    return pool.slice(0, SUGGESTIONS_MAX);
-  }, [items, PRODUCTS]);
+    const pool = ADVICE.length > 0 ? ADVICE : PRODUCTS;
+    return pool.filter((p) => !inCart.has(p.id)).slice(0, SUGGESTIONS_MAX);
+  }, [items, PRODUCTS, ADVICE]);
 
   const handleItemDeleted = (productName: string): void => {
     setToastMessage(`${productName} retiré du panier`);
@@ -58,7 +59,7 @@ export default function CartScreen(): React.ReactElement {
           style={{ paddingHorizontal: 24, paddingBottom: 8 }}
         >
           <IconButton
-            icon={ArrowLeft}
+            icon={ChevronLeft}
             variant="light"
             onPress={() => router.back()}
             accessibilityLabel="Retour"
@@ -87,7 +88,7 @@ export default function CartScreen(): React.ReactElement {
           style={{ paddingHorizontal: 24 }}
         >
           <IconButton
-            icon={ArrowLeft}
+            icon={ChevronLeft}
             variant="light"
             onPress={() => router.back()}
             accessibilityLabel="Retour"

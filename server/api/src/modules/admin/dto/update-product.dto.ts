@@ -5,7 +5,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   Min,
   MinLength,
@@ -29,7 +28,8 @@ export class UpdateProductDto {
   price_eur?: number;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
+  @MinLength(1)
   category_id?: string;
 
   @IsOptional()

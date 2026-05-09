@@ -1,22 +1,39 @@
-import { useEffect, useMemo, useRef } from "react";
-import { Animated as RNAnimated, Dimensions, Pressable, ScrollView, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated as RNAnimated,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowRight, Heart } from "lucide-react-native";
 
 import FloatingCartBar from "@/components/cart/FloatingCartBar";
 import Screen from "@/components/layout/Screen";
 import CategoryChip from "@/components/menu/CategoryChip";
-import { colors, font, radius, shadow } from "@/constants/theme";
+import { colors, font, radius } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import { useMenuStore } from "@/store/menu.store";
 import { useProfileStore } from "@/store/profile.store";
+import type { Product } from "@/types";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const logoImage = require("../../../assets/images/pops-logo.png") as number;
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = (SCREEN_WIDTH - 20 * 2 - 12) / 2;
+const HERO_H_PADDING = 20;
+const HERO_SLIDE_WIDTH = SCREEN_WIDTH - HERO_H_PADDING * 2;
+const HERO_AUTOPLAY_MS = 4500;
 
 const MARQUEE_TEXT =
   "   FAIT MAISON 🔥   SMASH BURGERS   TACOS   BOWLS   WRAPS   DU PEUPLE POUR LE PEUPLE 💛   VILLEPINTE 93   VIENS RÉCUPÉRER   CASH OU CB   ";
@@ -69,13 +86,260 @@ function MarqueeTape(): React.ReactElement {
   );
 }
 
+function SignatureSlide({
+  product,
+  onPress,
+}: {
+  product: Product;
+  onPress: () => void;
+}): React.ReactElement {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Commander ${product.name}`}
+      onPress={onPress}
+      style={{
+        width: HERO_SLIDE_WIDTH,
+        backgroundColor: colors.primary,
+        borderRadius: radius.xl,
+        overflow: "hidden",
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          height: 220,
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.ink,
+              alignSelf: "flex-start",
+              borderRadius: radius.pill,
+              paddingHorizontal: 10,
+              paddingVertical: 3,
+              marginBottom: 8,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: font.bodyBold,
+                fontSize: 9,
+                letterSpacing: 2,
+                color: colors.primary,
+              }}
+            >
+              SIGNATURE
+            </Text>
+          </View>
+
+          <Text
+            numberOfLines={2}
+            style={{
+              fontFamily: font.display,
+              fontSize: 32,
+              lineHeight: 34,
+              color: colors.ink,
+              letterSpacing: 1,
+            }}
+          >
+            {product.name.toUpperCase()}
+          </Text>
+
+          <Text
+            numberOfLines={1}
+            style={{
+              fontFamily: font.body,
+              fontSize: 12,
+              lineHeight: 16,
+              color: "rgba(0,0,0,0.55)",
+              marginTop: 4,
+            }}
+          >
+            {product.description}
+          </Text>
+
+          <View
+            style={{
+              backgroundColor: colors.ink,
+              alignSelf: "flex-start",
+              borderRadius: radius.pill,
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              marginTop: "auto",
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: font.bodyBold,
+                fontSize: 12,
+                color: colors.white,
+                letterSpacing: 0.5,
+              }}
+            >
+              COMMANDER
+            </Text>
+            <ArrowRight size={14} color={colors.white} strokeWidth={2.5} />
+          </View>
+        </View>
+
+        <View style={{ width: "42%", position: "relative" }}>
+          <Image
+            source={product.image_url}
+            contentFit="cover"
+            style={{ width: "100%", height: "100%" }}
+            accessibilityIgnoresInvertColors
+          />
+          <View
+            style={{
+              position: "absolute",
+              bottom: 12,
+              right: 12,
+              backgroundColor: colors.primary,
+              borderRadius: radius.sm,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: font.display,
+                fontSize: 22,
+                color: colors.ink,
+              }}
+            >
+              {formatPriceEUR(product.price_eur)}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+const HERO_TRANSITION_MS = 700;
+const HERO_SLIDE_STEP = HERO_SLIDE_WIDTH + 12;
+
+function SignatureCarousel({
+  products,
+}: {
+  products: Product[];
+}): React.ReactElement | null {
+  const router = useRouter();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const translateX = useSharedValue(0);
+
+  useEffect(() => {
+    if (activeIndex >= products.length) {
+      setActiveIndex(0);
+    }
+  }, [products.length, activeIndex]);
+
+  useEffect(() => {
+    translateX.value = withTiming(-activeIndex * HERO_SLIDE_STEP, {
+      duration: HERO_TRANSITION_MS,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [activeIndex, translateX]);
+
+  useEffect(() => {
+    if (products.length <= 1) return;
+    const id = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % products.length);
+    }, HERO_AUTOPLAY_MS);
+    return () => clearInterval(id);
+  }, [products.length]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  if (products.length === 0) return null;
+
+  return (
+    <View style={{ marginTop: 16 }}>
+      <View
+        style={{
+          paddingHorizontal: HERO_H_PADDING,
+          overflow: "hidden",
+        }}
+      >
+        <Animated.View
+          style={[{ flexDirection: "row", gap: 12 }, animatedStyle]}
+        >
+          {products.map((p) => (
+            <SignatureSlide
+              key={p.id}
+              product={p}
+              onPress={() =>
+                router.push({
+                  pathname: "/product/[id]",
+                  params: { id: p.id },
+                })
+              }
+            />
+          ))}
+        </Animated.View>
+      </View>
+
+      {products.length > 1 ? (
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 10,
+          }}
+        >
+          {products.map((p, i) => {
+            const active = i === activeIndex;
+            return (
+              <View
+                key={p.id}
+                style={{
+                  width: active ? 18 : 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: active ? colors.ink : "rgba(0,0,0,0.2)",
+                }}
+              />
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export default function AccueilScreen(): React.ReactElement {
   const router = useRouter();
   const name = useProfileStore((s) => s.profile.name);
   const PRODUCTS = useMenuStore((s) => s.products);
   const CATEGORIES = useMenuStore((s) => s.categories);
+  const SIGNATURES = useMenuStore((s) => s.signatures);
+  const fetchMenu = useMenuStore((s) => s.fetchMenu);
 
-  const featured = useMemo(() => PRODUCTS.find((p) => p.tags.includes("TOP")) ?? PRODUCTS[0], [PRODUCTS]);
+  useFocusEffect(
+    useCallback(() => {
+      void fetchMenu();
+    }, [fetchMenu]),
+  );
+
+  const heroProducts = useMemo<Product[]>(() => {
+    if (SIGNATURES.length > 0) return SIGNATURES.slice(0, 3);
+    const fallback = PRODUCTS.find((p) => p.tags.includes("TOP")) ?? PRODUCTS[0];
+    return fallback ? [fallback] : [];
+  }, [SIGNATURES, PRODUCTS]);
   const topPicks = useMemo(
     () => PRODUCTS.filter((p) => p.tags.includes("TOP")).slice(0, 6),
     [PRODUCTS],
@@ -133,140 +397,8 @@ export default function AccueilScreen(): React.ReactElement {
       {/* ── MARQUEE TAPE ── */}
       <MarqueeTape />
 
-      {/* ── HERO BANNER ── */}
-      <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Commander ${featured.name}`}
-          onPress={() =>
-            router.push({ pathname: "/product/[id]", params: { id: featured.id } })
-          }
-          style={{
-            backgroundColor: colors.primary,
-            borderRadius: radius.xl,
-            overflow: "hidden",
-            ...shadow.hero,
-          }}
-        >
-          <View style={{ flexDirection: "row", height: 200 }}>
-            {/* Left content */}
-            <View
-              style={{
-                flex: 1,
-                padding: 20,
-                justifyContent: "space-between",
-              }}
-            >
-              <View>
-                <View
-                  style={{
-                    backgroundColor: colors.ink,
-                    alignSelf: "flex-start",
-                    borderRadius: radius.pill,
-                    paddingHorizontal: 10,
-                    paddingVertical: 3,
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: font.bodyBold,
-                      fontSize: 9,
-                      letterSpacing: 2,
-                      color: colors.primary,
-                    }}
-                  >
-                    SIGNATURE
-                  </Text>
-                </View>
-
-                <Text
-                  numberOfLines={2}
-                  style={{
-                    fontFamily: font.display,
-                    fontSize: 36,
-                    lineHeight: 38,
-                    color: colors.ink,
-                    letterSpacing: 1,
-                  }}
-                >
-                  {featured.name.toUpperCase()}
-                </Text>
-
-                <Text
-                  numberOfLines={2}
-                  style={{
-                    fontFamily: font.body,
-                    fontSize: 12,
-                    lineHeight: 16,
-                    color: "rgba(0,0,0,0.55)",
-                    marginTop: 4,
-                  }}
-                >
-                  {featured.description}
-                </Text>
-              </View>
-
-              <View
-                style={{
-                  backgroundColor: colors.ink,
-                  alignSelf: "flex-start",
-                  borderRadius: radius.pill,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  marginTop: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: font.bodyBold,
-                    fontSize: 12,
-                    color: colors.white,
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  COMMANDER
-                </Text>
-                <ArrowRight size={14} color={colors.white} strokeWidth={2.5} />
-              </View>
-            </View>
-
-            {/* Right image with price overlay */}
-            <View style={{ width: "42%", position: "relative" }}>
-              <Image
-                source={featured?.image_url}
-                contentFit="cover"
-                style={{ width: "100%", height: "100%" }}
-                accessibilityIgnoresInvertColors
-              />
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: 12,
-                  right: 12,
-                  backgroundColor: colors.primary,
-                  borderRadius: radius.sm,
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: font.display,
-                    fontSize: 22,
-                    color: colors.ink,
-                  }}
-                >
-                  {formatPriceEUR(featured?.price_eur ?? 0)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </Pressable>
-      </View>
+      {/* ── HERO SIGNATURE CAROUSEL ── */}
+      <SignatureCarousel products={heroProducts} />
 
       {/* ── CATEGORIES ── */}
       <View style={{ marginTop: 24 }}>
@@ -386,10 +518,8 @@ export default function AccueilScreen(): React.ReactElement {
               }
               style={{
                 width: CARD_WIDTH,
-                borderRadius: radius.lg,
                 overflow: "hidden",
                 backgroundColor: colors.white,
-                ...shadow.card,
               }}
             >
               <View style={{ position: "relative" }}>
@@ -476,10 +606,8 @@ export default function AccueilScreen(): React.ReactElement {
                 }
                 style={{
                   width: CARD_WIDTH,
-                  borderRadius: radius.lg,
                   overflow: "hidden",
                   backgroundColor: colors.white,
-                  ...shadow.card,
                 }}
               >
                 <Image

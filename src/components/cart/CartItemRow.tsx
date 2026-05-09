@@ -112,10 +112,13 @@ function CompactStepper({ value, onChange }: CompactStepperProps): React.ReactEl
           plusScale.value = withTiming(1, { duration: 160 });
         }}
         hitSlop={6}
-        className="bg-on-surface items-center justify-center rounded-full"
-        style={[{ width: 36, height: 36 }, plusStyle]}
+        className="items-center justify-center rounded-full"
+        style={[
+          { width: 36, height: 36, backgroundColor: colors.primary },
+          plusStyle,
+        ]}
       >
-        <Plus size={16} color={colors.surface} strokeWidth={2.5} />
+        <Plus size={16} color={colors.ink} strokeWidth={2.5} />
       </AnimatedPressable>
     </View>
   );

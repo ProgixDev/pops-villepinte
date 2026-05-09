@@ -57,7 +57,7 @@ export default function FloatingCartBar(): React.ReactElement | null {
         position: "absolute",
         left: 20,
         right: 20,
-        bottom: insets.bottom + 60,
+        bottom: insets.bottom + 20,
       }}
     >
       <AnimatedPressable

@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import {
   Award,
   Bell,
+  Calendar,
   CheckCircle,
+  Clock,
   FileText,
   Heart,
   LogOut,
@@ -18,6 +20,7 @@ import TextField from "@/components/form/TextField";
 import StatsCard from "@/components/profile/StatsCard";
 import SettingsRow from "@/components/profile/SettingsRow";
 import { colors, font, radius, shadow } from "@/constants/theme";
+import { menuApi, type ShopSettings } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { useProfileStore } from "@/store/profile.store";
 
@@ -43,6 +46,22 @@ export default function ProfileScreen(): React.ReactElement {
   );
   const [saved, setSaved] = useState(false);
   const [phoneError, setPhoneError] = useState<string | undefined>();
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void menuApi
+      .getShopSettings()
+      .then((data) => {
+        if (!cancelled) setShopSettings(data);
+      })
+      .catch(() => {
+        // Silent fail — section just hides on error.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const displayName =
     profile.name === "Invité" ? "SALUT !" : profile.name.toUpperCase();
@@ -312,6 +331,25 @@ export default function ProfileScreen(): React.ReactElement {
           />
         </View>
 
+        {shopSettings ? (
+          <>
+            <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
+              <ReadOnlyInfoRow
+                icon={Calendar}
+                label="Jours d'ouverture"
+                value={shopSettings.open_days}
+              />
+            </View>
+            <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
+              <ReadOnlyInfoRow
+                icon={Clock}
+                label="Temps d'ouverture"
+                value={shopSettings.open_hours}
+              />
+            </View>
+          </>
+        ) : null}
+
         <View style={{ paddingHorizontal: 20, marginTop: 22 }}>
           <Pressable
             accessibilityRole="button"
@@ -453,5 +491,57 @@ export default function ProfileScreen(): React.ReactElement {
         </Text>
       </View>
     </Screen>
+  );
+}
+
+type ReadOnlyInfoRowProps = {
+  icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  label: string;
+  value: string;
+};
+
+function ReadOnlyInfoRow({
+  icon: Icon,
+  label,
+  value,
+}: ReadOnlyInfoRowProps): React.ReactElement {
+  return (
+    <View>
+      <Text
+        style={{
+          fontFamily: font.bodyBold,
+          fontSize: 10,
+          letterSpacing: 2,
+          marginBottom: 8,
+          color: colors.inkMuted,
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </Text>
+      <View
+        style={{
+          backgroundColor: "#F5F5F5",
+          borderRadius: 12,
+          paddingHorizontal: 20,
+          paddingVertical: 18,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <Icon size={18} color={colors.primary} strokeWidth={2.5} />
+        <Text
+          style={{
+            fontFamily: font.body,
+            fontSize: 16,
+            color: colors.ink,
+            flexShrink: 1,
+          }}
+        >
+          {value}
+        </Text>
+      </View>
+    </View>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Text, TextInput, View, type KeyboardTypeOptions } from "react-native";
 
-import { colors } from "@/constants/theme";
+import { colors, font } from "@/constants/theme";
 
 export type TextFieldProps = {
   label: string;
@@ -43,15 +43,22 @@ export default function TextField({
   return (
     <View>
       <Text
-        className="font-sans-bold text-on-surface-variant uppercase"
-        style={{ fontSize: 10, letterSpacing: 2, marginBottom: 8 }}
+        style={{
+          fontFamily: font.bodyBold,
+          fontSize: 10,
+          letterSpacing: 2,
+          marginBottom: 8,
+          color: colors.inkMuted,
+          textTransform: "uppercase",
+        }}
       >
         {label}
       </Text>
 
       <View
-        className="bg-surface-container-highest rounded-lg"
         style={{
+          backgroundColor: "#F5F5F5",
+          borderRadius: 12,
           paddingHorizontal: 20,
           paddingVertical: 18,
           borderColor,
@@ -69,22 +76,35 @@ export default function TextField({
           autoCapitalize={autoCapitalize}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          className="font-sans text-on-surface"
-          style={{ fontSize: 16, paddingVertical: 0 }}
+          style={{
+            fontFamily: font.body,
+            fontSize: 16,
+            color: colors.ink,
+            paddingVertical: 0,
+          }}
         />
       </View>
 
       {hasError ? (
         <Text
-          className="font-sans-semibold text-error"
-          style={{ fontSize: 11, marginTop: 6 }}
+          style={{
+            fontFamily: font.bodySemi,
+            fontSize: 11,
+            marginTop: 6,
+            color: colors.error,
+          }}
         >
           {error}
         </Text>
       ) : showHelper ? (
         <Text
-          className="font-sans text-on-surface-variant"
-          style={{ fontSize: 11, lineHeight: 16, marginTop: 6 }}
+          style={{
+            fontFamily: font.body,
+            fontSize: 11,
+            lineHeight: 16,
+            marginTop: 6,
+            color: colors.inkMuted,
+          }}
         >
           {helper}
         </Text>

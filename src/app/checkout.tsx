@@ -48,8 +48,10 @@ export default function CheckoutScreen(): React.ReactElement {
     profile.phone ? formatFrenchMobile(profile.phone) : "",
   );
   const [confirmed, setConfirmed] = useState<boolean>(false);
+  const [confirmError, setConfirmError] = useState<string | undefined>();
   const [nameError, setNameError] = useState<string | undefined>();
   const [phoneError, setPhoneError] = useState<string | undefined>();
+  const [submitError, setSubmitError] = useState<string | undefined>();
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
@@ -113,19 +115,25 @@ export default function CheckoutScreen(): React.ReactElement {
       return;
     }
     if (!confirmed) {
+      setConfirmError("Coche la case pour confirmer ton retrait.");
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
+    setConfirmError(undefined);
 
     try {
+      setSubmitError(undefined);
       const newOrder = await placeOrder(items, name.trim());
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       void updateName(name.trim());
       clearCart();
       setPendingOrderId(newOrder.id);
       setShowConfirmation(true);
-    } catch {
+    } catch (e: unknown) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      const message =
+        e instanceof Error ? e.message : "Erreur lors de la commande";
+      setSubmitError(message);
     }
   };
 
@@ -324,6 +332,7 @@ export default function CheckoutScreen(): React.ReactElement {
           onPress={() => {
             void Haptics.selectionAsync();
             setConfirmed(!confirmed);
+            setConfirmError(undefined);
           }}
           style={{
             flexDirection: "row",
@@ -357,6 +366,21 @@ export default function CheckoutScreen(): React.ReactElement {
           </View>
           <ShieldCheck size={20} color={confirmed ? colors.primary : colors.inkMuted} strokeWidth={2} />
         </Pressable>
+
+        {confirmError !== undefined ? (
+          <Text
+            style={{
+              fontFamily: font.bodySemi,
+              fontSize: 11,
+              color: colors.error,
+              paddingHorizontal: 20,
+              marginTop: -8,
+              marginBottom: 12,
+            }}
+          >
+            {confirmError}
+          </Text>
+        ) : null}
 
         {/* Separator */}
         <View style={{ height: 8, backgroundColor: "#F5F5F5" }} />
@@ -458,6 +482,20 @@ export default function CheckoutScreen(): React.ReactElement {
           borderTopColor: "#F0F0F0",
         }}
       >
+        {submitError !== undefined ? (
+          <Text
+            style={{
+              fontFamily: font.bodySemi,
+              fontSize: 12,
+              color: colors.error,
+              marginBottom: 10,
+              textAlign: "center",
+            }}
+          >
+            {submitError}
+          </Text>
+        ) : null}
+
         <Pressable
           onPress={() => void handleConfirm()}
           disabled={orderLoading}

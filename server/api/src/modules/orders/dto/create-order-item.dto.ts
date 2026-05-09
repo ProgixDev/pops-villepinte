@@ -4,18 +4,22 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  IsUUID,
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 
 export class CreateOrderItemDto {
-  @IsUUID()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
   productId: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
   variantId?: string;
 
   @IsInt()
@@ -25,7 +29,7 @@ export class CreateOrderItemDto {
 
   @IsOptional()
   @IsArray()
-  @IsUUID(undefined, { each: true })
+  @IsString({ each: true })
   @ArrayMaxSize(15)
   supplements?: string[];
 

@@ -2,199 +2,218 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Command, CommandRunner } from 'nest-commander';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ADMIN } from '../../common/supabase/supabase.module';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 
-// Menu data from mobile app (inline for seed independence)
+const IMAGES_BUCKET = 'product-images';
+// repo-root/assets/products from this file: 5 levels up
+const IMAGES_DIR = path.resolve(__dirname, '../../../../../assets/products');
+
+// Mirror of mobile mock data (src/data/menu.ts) — kept inline so seed has no
+// frontend deps. Ids are stable slugs because schema uses text primary keys.
+
 const CATEGORIES = [
-  { name: 'Box', icon: '📦', display_order: 0 },
-  { name: 'Smash Burgers', icon: '🍔', display_order: 1 },
-  { name: 'Buckets', icon: '🪣', display_order: 2 },
-  { name: 'Bowls', icon: '🥗', display_order: 3 },
-  { name: 'Wraps', icon: '🌯', display_order: 4 },
-  { name: 'Frites', icon: '🍟', display_order: 5 },
+  { id: 'box', name: 'Box', icon: 'package', display_order: 1 },
+  { id: 'smash-burgers', name: 'Smash Burgers', icon: 'sandwich', display_order: 2 },
+  { id: 'bucket', name: 'Buckets', icon: 'drumstick', display_order: 3 },
+  { id: 'bowls', name: 'Bowls', icon: 'soup', display_order: 4 },
+  { id: 'wraps', name: 'Wraps', icon: 'wheat', display_order: 5 },
+  { id: 'frites', name: 'Frites', icon: 'cookie', display_order: 6 },
 ];
 
 const SUPPLEMENTS = [
-  { name: 'Sauce Algérienne', price_eur: 0 },
-  { name: 'Sauce Samouraï', price_eur: 0 },
-  { name: 'Sauce Blanche', price_eur: 0 },
-  { name: 'Sauce Barbecue', price_eur: 0 },
-  { name: 'Sauce Ketchup', price_eur: 0 },
-  { name: 'Sauce Andalouse', price_eur: 0 },
-  { name: 'Sauce Harissa', price_eur: 0 },
-  { name: 'Sauce Biggy Burger', price_eur: 0 },
-  { name: 'Cheddar Fondu', price_eur: 1 },
-  { name: 'Bacon', price_eur: 1.5 },
-  { name: 'Oeuf', price_eur: 1 },
-  { name: 'Galette de Pomme de Terre', price_eur: 1 },
-  { name: 'Poulet Croustillant', price_eur: 2 },
-  { name: 'Steak Haché', price_eur: 2 },
-  { name: 'Supplément Frites', price_eur: 1.5 },
+  { id: 'oignons-caramelises', name: 'Oignon caramélisée', price_eur: 1 },
+  { id: 'oignons-frits', name: 'Oignon frits', price_eur: 1 },
+  { id: 'jalapenos', name: 'Jalapeños', price_eur: 1 },
+  { id: 'galette-pomme-terre', name: 'Galette de pomme de terre', price_eur: 1.5 },
+  { id: 'cheddar', name: 'Chedar', price_eur: 1 },
+  { id: 'fromage-chevre', name: 'Fromage de chèvre', price_eur: 1 },
+  { id: 'raclette', name: 'Raclette', price_eur: 1 },
+  { id: 'viande-hachee', name: 'Viande hachée', price_eur: 2 },
+  { id: 'tenders-supp', name: 'Tenders', price_eur: 2 },
+  { id: 'cordon-bleu', name: 'Cordon bleu', price_eur: 2 },
+  { id: 'pastrami', name: 'Pastrami', price_eur: 2 },
+  { id: 'bacon', name: 'Bacon', price_eur: 1 },
+  { id: 'sauce-blanche', name: 'Sauce blanche maison', price_eur: 0 },
+  { id: 'sauce-biggi', name: 'Sauce Biggi', price_eur: 0 },
+  { id: 'sauce-poivre', name: 'Sauce poivrée', price_eur: 0 },
 ];
 
-const PRODUCTS = [
+type ProductSeed = {
+  id: string;
+  category_id: string;
+  name: string;
+  description: string;
+  price_eur: number;
+  tags: string[];
+  prep_time_minutes: number;
+  image_file: string;
+};
+
+const PRODUCTS: ProductSeed[] = [
   {
-    name: "Pop's Box Poulet",
+    id: 'box-familiale',
+    category_id: 'box',
+    name: 'BOX FAMILLIALE',
     description:
-      'Tenders de poulet croustillant, frites maison, coleslaw et sauce au choix',
-    price_eur: 12,
-    category: 'Box',
-    prep_time_minutes: 12,
-    tags: ['TOP'],
-  },
-  {
-    name: "Pop's Box Mixte",
-    description:
-      'Mix tenders & nuggets, frites maison, coleslaw et sauce au choix',
-    price_eur: 13,
-    category: 'Box',
-    prep_time_minutes: 12,
-    tags: [],
-  },
-  {
-    name: "Pop's Box Nuggets",
-    description: '10 nuggets croustillants, frites maison, coleslaw et sauce au choix',
-    price_eur: 11,
-    category: 'Box',
-    prep_time_minutes: 10,
-    tags: [],
-  },
-  {
-    name: 'Le Classic Smash',
-    description:
-      'Steak smashé, cheddar fondu, oignons caramélisés, sauce maison',
-    price_eur: 9,
-    category: 'Smash Burgers',
-    prep_time_minutes: 10,
-    tags: ['TOP'],
-  },
-  {
-    name: 'Le Double Smash',
-    description:
-      'Double steak smashé, double cheddar, pickles, sauce secrète',
-    price_eur: 12,
-    category: 'Smash Burgers',
-    prep_time_minutes: 12,
-    tags: ['NOUVEAU'],
-  },
-  {
-    name: 'Le Chicken Smash',
-    description:
-      'Poulet pané croustillant, cheddar, salade, tomate, sauce algérienne',
-    price_eur: 10,
-    category: 'Smash Burgers',
-    prep_time_minutes: 12,
-    tags: [],
-  },
-  {
-    name: 'Le Spicy Smash',
-    description:
-      'Steak smashé, jalapeños, pepper jack, oignons frits, sauce piquante',
-    price_eur: 11,
-    category: 'Smash Burgers',
-    prep_time_minutes: 12,
-    tags: ['SPICY'],
-  },
-  {
-    name: 'Bucket Familial',
-    description: '12 tenders, 12 nuggets, grande frites, 3 sauces',
+      '4 smash burger, 5 wings, 5 tenders, Frite XXL, 4 boisson aux choix, Sauce blanche maison.',
     price_eur: 29,
-    category: 'Buckets',
-    prep_time_minutes: 18,
-    tags: [],
-  },
-  {
-    name: 'Bucket Tenders',
-    description: '8 tenders de poulet, frites, 2 sauces au choix',
-    price_eur: 18,
-    category: 'Buckets',
-    prep_time_minutes: 15,
     tags: ['TOP'],
+    prep_time_minutes: 20,
+    image_file: 'box_familiale.png',
   },
   {
-    name: 'Bucket Nuggets',
-    description: '20 nuggets croustillants, frites, 2 sauces au choix',
-    price_eur: 16,
-    category: 'Buckets',
+    id: 'box-nashville',
+    category_id: 'box',
+    name: 'Box nashville',
+    description: '2 tenders nashville, frite, burger aux choix et une boisson.',
+    price_eur: 15,
+    tags: ['SPICY', 'NOUVEAU'],
     prep_time_minutes: 15,
-    tags: [],
+    image_file: 'box_nashville.png',
   },
   {
-    name: 'Bowl Poulet Grillé',
+    id: 'smash-baleze',
+    category_id: 'smash-burgers',
+    name: 'Le baleze',
     description:
-      'Riz parfumé, poulet grillé mariné, légumes rôtis, sauce sésame',
-    price_eur: 11,
-    category: 'Bowls',
-    prep_time_minutes: 12,
-    tags: [],
-  },
-  {
-    name: 'Bowl Crispy',
-    description:
-      'Riz, tenders croustillants, avocat, edamame, sauce teriyaki',
+      '3 steak XL, SAUCE BIGGI, GALTT DE POMME DE TERRE, 2 tenders, Salade, Chedar.',
     price_eur: 12,
-    category: 'Bowls',
-    prep_time_minutes: 12,
     tags: ['NOUVEAU'],
+    prep_time_minutes: 15,
+    image_file: 'burger_le_baleze.png',
   },
   {
-    name: 'Bowl Veggie',
+    id: 'smash-smoky',
+    category_id: 'smash-burgers',
+    name: 'Smoky',
     description:
-      'Riz complet, falafels, houmous, légumes grillés, sauce tahini',
+      '2steak Viande hachée, Pastrami, Sauce poivré, Oignon caramélisé, Chedar.',
     price_eur: 10,
-    category: 'Bowls',
-    prep_time_minutes: 10,
-    tags: [],
-  },
-  {
-    name: 'Wrap Poulet',
-    description:
-      'Tortilla, poulet croustillant, crudités, cheddar, sauce au choix',
-    price_eur: 8,
-    category: 'Wraps',
-    prep_time_minutes: 8,
-    tags: [],
-  },
-  {
-    name: 'Wrap Spicy',
-    description:
-      'Tortilla, poulet épicé, jalapeños, oignons frits, sauce piquante',
-    price_eur: 9,
-    category: 'Wraps',
-    prep_time_minutes: 8,
-    tags: ['SPICY'],
-  },
-  {
-    name: 'Wrap Veggie',
-    description:
-      'Tortilla, falafels, houmous, crudités, sauce blanche',
-    price_eur: 8,
-    category: 'Wraps',
-    prep_time_minutes: 8,
-    tags: [],
-  },
-  {
-    name: 'Frites Classiques',
-    description: 'Frites maison dorées et croustillantes',
-    price_eur: 4,
-    category: 'Frites',
-    prep_time_minutes: 8,
-    tags: [],
-  },
-  {
-    name: 'Frites Cheddar Bacon',
-    description: 'Frites maison, cheddar fondu, bacon émietté, ciboulette',
-    price_eur: 7,
-    category: 'Frites',
-    prep_time_minutes: 10,
-    tags: ['TOP'],
-  },
-  {
-    name: 'Frites Poutine',
-    description: 'Frites maison, sauce gravy, fromage en grains',
-    price_eur: 8,
-    category: 'Frites',
-    prep_time_minutes: 10,
     tags: ['NOUVEAU'],
+    prep_time_minutes: 15,
+    image_file: 'burger_smoky.png',
+  },
+  {
+    id: 'smash-gourmet',
+    category_id: 'smash-burgers',
+    name: 'Le gourmet',
+    description: '2 steak XL, Jalapenos, pastrami, Oignon caramélisé, Chedar.',
+    price_eur: 10,
+    tags: ['NOUVEAU', 'TOP'],
+    prep_time_minutes: 15,
+    image_file: 'burger_gourmet.png',
+  },
+  {
+    id: 'burger-chicken-nashville',
+    category_id: 'smash-burgers',
+    name: 'Burger chicken nashville',
+    description: 'Burger au poulet mariné façon Nashville, bien piquant.',
+    price_eur: 9,
+    tags: ['SPICY', 'NOUVEAU'],
+    prep_time_minutes: 15,
+    image_file: 'burger_nashville.png',
+  },
+  {
+    id: 'frite-cheddar',
+    category_id: 'frites',
+    name: 'Frite chedar',
+    description: 'Frites dorées nappées de cheddar fondant.',
+    price_eur: 4,
+    tags: [],
+    prep_time_minutes: 10,
+    image_file: 'frite_cheddar.png',
+  },
+  {
+    id: 'frite-cheddar-bacon',
+    category_id: 'frites',
+    name: 'Frite chedar bacon oignon frits',
+    description: 'Frites, cheddar, bacon croustillant, oignons frits.',
+    price_eur: 5,
+    tags: ['TOP'],
+    prep_time_minutes: 10,
+    image_file: 'frite_bacon.png',
+  },
+  {
+    id: 'bucket-wings',
+    category_id: 'bucket',
+    name: 'Buckets wings',
+    description: '5 wings, frite, boisson.',
+    price_eur: 8,
+    tags: [],
+    prep_time_minutes: 15,
+    image_file: 'bucket_wings.png',
+  },
+  {
+    id: 'bucket-tenders',
+    category_id: 'bucket',
+    name: 'Buckets tenders',
+    description: '5 tenders, frite, boisson.',
+    price_eur: 8,
+    tags: [],
+    prep_time_minutes: 15,
+    image_file: 'bucket_tenders.png',
+  },
+  {
+    id: 'bucket-mix',
+    category_id: 'bucket',
+    name: 'Buckets mix',
+    description: '6 wings, 6 tenders, 2 boisson, 2 frite.',
+    price_eur: 16,
+    tags: ['TOP'],
+    prep_time_minutes: 15,
+    image_file: 'bucket_mix.png',
+  },
+  {
+    id: 'bucket-family',
+    category_id: 'bucket',
+    name: 'Buckets family',
+    description: '10 tenders, 10 wings, 3 frite, 3 boisson.',
+    price_eur: 26,
+    tags: ['TOP'],
+    prep_time_minutes: 20,
+    image_file: 'bucket_family.png',
+  },
+  {
+    id: 'bowl-tenders',
+    category_id: 'bowls',
+    name: 'Bolws tenders',
+    description: 'Frite, bacon, sauce chedar, oignon frits.',
+    price_eur: 10,
+    tags: [],
+    prep_time_minutes: 12,
+    image_file: 'bowl_tenders.png',
+  },
+  {
+    id: 'bowl-nashville',
+    category_id: 'bowls',
+    name: 'Bolws nashville',
+    description: 'Frite, tenders nashville, bacon, sauce chedar, oignon frits.',
+    price_eur: 10,
+    tags: ['SPICY'],
+    prep_time_minutes: 12,
+    image_file: 'bowl_nashville.png',
+  },
+  {
+    id: 'bowl-gratine',
+    category_id: 'bowls',
+    name: 'Bolws gratiné',
+    description:
+      'Frite, tenders, bacon, sauce chedar, oignon frits et mozarella.',
+    price_eur: 11,
+    tags: ['TOP', 'NOUVEAU'],
+    prep_time_minutes: 12,
+    image_file: 'bowl_gratine.png',
+  },
+  {
+    id: 'wrap-nashville',
+    category_id: 'wraps',
+    name: 'Wrap nashville',
+    description: 'Tenders nashville, salade, chedar, sauce aux choix.',
+    price_eur: 8,
+    tags: ['SPICY', 'NOUVEAU'],
+    prep_time_minutes: 10,
+    image_file: 'wrap_nashville.png',
   },
 ];
 
@@ -207,15 +226,49 @@ export class SeedCommand extends CommandRunner {
     super();
   }
 
+  private async ensureBucket(): Promise<void> {
+    const { data: existing } = await this.supabase.storage.getBucket(IMAGES_BUCKET);
+    if (existing) return;
+    const { error } = await this.supabase.storage.createBucket(IMAGES_BUCKET, {
+      public: true,
+    });
+    if (error && !/already exists/i.test(error.message)) {
+      throw new Error(`Bucket create failed: ${error.message}`);
+    }
+  }
+
+  private async uploadImages(): Promise<Map<string, string>> {
+    await this.ensureBucket();
+    const urls = new Map<string, string>();
+    const files = Array.from(new Set(PRODUCTS.map((p) => p.image_file)));
+    for (const file of files) {
+      const full = path.join(IMAGES_DIR, file);
+      const buf = await fs.readFile(full);
+      const { error: upErr } = await this.supabase.storage
+        .from(IMAGES_BUCKET)
+        .upload(file, buf, { upsert: true, contentType: 'image/png' });
+      if (upErr) {
+        throw new Error(`Upload ${file} failed: ${upErr.message}`);
+      }
+      const { data } = this.supabase.storage
+        .from(IMAGES_BUCKET)
+        .getPublicUrl(file);
+      urls.set(file, data.publicUrl);
+    }
+    console.log(`✅ ${urls.size} product images uploaded to "${IMAGES_BUCKET}"`);
+    return urls;
+  }
+
   async run(): Promise<void> {
     console.log('🌱 Seeding menu data...');
 
-    // 1. Upsert categories
+    const imageUrls = await this.uploadImages();
+
     const { data: categories, error: catError } = await this.supabase
       .from('categories')
       .upsert(
         CATEGORIES.map((c) => ({ ...c, is_active: true })),
-        { onConflict: 'name' },
+        { onConflict: 'id' },
       )
       .select();
 
@@ -225,14 +278,11 @@ export class SeedCommand extends CommandRunner {
     }
     console.log(`✅ ${categories.length} categories upserted`);
 
-    const categoryMap = new Map(categories.map((c) => [c.name, c.id]));
-
-    // 2. Upsert supplements
     const { data: supplements, error: supError } = await this.supabase
       .from('supplements')
       .upsert(
         SUPPLEMENTS.map((s) => ({ ...s, is_active: true })),
-        { onConflict: 'name' },
+        { onConflict: 'id' },
       )
       .select();
 
@@ -242,23 +292,15 @@ export class SeedCommand extends CommandRunner {
     }
     console.log(`✅ ${supplements.length} supplements upserted`);
 
-    const supplementIds = supplements.map((s) => s.id);
-
-    // 3. Upsert products
-    const productRows = PRODUCTS.map((p) => ({
-      name: p.name,
-      description: p.description,
-      price_eur: p.price_eur,
-      category_id: categoryMap.get(p.category),
-      prep_time_minutes: p.prep_time_minutes,
-      tags: p.tags,
+    const productRows = PRODUCTS.map(({ image_file, ...rest }) => ({
+      ...rest,
+      image_path: imageUrls.get(image_file) ?? null,
       is_available: true,
-      is_active: true,
     }));
 
     const { data: products, error: prodError } = await this.supabase
       .from('products')
-      .upsert(productRows, { onConflict: 'name' })
+      .upsert(productRows, { onConflict: 'id' })
       .select();
 
     if (prodError) {
@@ -267,16 +309,16 @@ export class SeedCommand extends CommandRunner {
     }
     console.log(`✅ ${products.length} products upserted`);
 
-    // 4. Link all supplements to all products (for this restaurant, all are available)
-    const junctionRows = products.flatMap((product) =>
-      supplementIds.map((supplementId) => ({
-        product_id: product.id,
-        supplement_id: supplementId,
-      })),
+    // All products allow all supplements (matches mock ALL_SUPPLEMENTS)
+    const junctionRows = PRODUCTS.flatMap((p) =>
+      SUPPLEMENTS.map((s) => ({ product_id: p.id, supplement_id: s.id })),
     );
 
-    // Delete existing and re-insert
-    await this.supabase.from('product_supplements').delete().neq('product_id', '00000000-0000-0000-0000-000000000000');
+    const productIds = PRODUCTS.map((p) => p.id);
+    await this.supabase
+      .from('product_supplements')
+      .delete()
+      .in('product_id', productIds);
 
     const { error: juncError } = await this.supabase
       .from('product_supplements')
@@ -286,9 +328,7 @@ export class SeedCommand extends CommandRunner {
       console.error('❌ Product supplements error:', juncError.message);
       return;
     }
-    console.log(
-      `✅ ${junctionRows.length} product-supplement links created`,
-    );
+    console.log(`✅ ${junctionRows.length} product-supplement links created`);
 
     console.log('🎉 Seed complete!');
   }
