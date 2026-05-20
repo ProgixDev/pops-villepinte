@@ -6,10 +6,14 @@ major_version = 15
 
 [auth]
 enable_signup = true
+# SMS OTP is now handled by Prelude (https://prelude.so). The API verifies the
+# code, then provisions/signs-in the Supabase user via the admin client. The
+# built-in Supabase SMS provider is intentionally disabled here so we never
+# accidentally double-send. Disable the SMS provider in the Supabase dashboard
+# (Auth → Providers → Phone) for the hosted project as well.
 [auth.sms]
-enable_signup = true
+enable_signup = false
 enable_confirmations = false
-template = "Your POP'S Villepinte verification code is {{ .Code }}"
 
 [storage]
 file_size_limit = "5MiB"

@@ -11,7 +11,11 @@
       "Bash(npx nest:*)",
       "Bash(node *)",
       "Bash(curl -sI \"https://ggjyxkofthmnwyjauwgd.supabase.co/storage/v1/object/public/product-images/box_familiale.png\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(curl -sL https://unpkg.com/@rnmapbox/maps@__TRACKED_VAR__/android/build.gradle)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch"
     ]
   },
   "enableAllProjectMcpServers": true,

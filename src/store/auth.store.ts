@@ -10,13 +10,17 @@ const DEV_OTP_CODE = "000000";
 const API_BASE =
   process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
 
+export type AuthChoice = "signin" | "register" | null;
+
 type AuthState = {
   onboardingDone: boolean;
   authed: boolean;
   signupDone: boolean;
+  authChoice: AuthChoice;
   phone: string;
   loading: boolean;
   completeOnboarding: () => void;
+  setAuthChoice: (choice: AuthChoice) => void;
   sendOtp: (phone: string) => Promise<{ error?: string }>;
   verifyOtp: (phone: string, code: string) => Promise<{ error?: string; isNewUser?: boolean }>;
   completeSignup: () => void;
@@ -24,12 +28,48 @@ type AuthState = {
   restoreSession: () => Promise<void>;
 };
 
+type SessionPayload = {
+  access_token: string;
+  refresh_token: string;
+  user?: { id?: string };
+};
+
+type ApiEnvelope<T> = { data?: T; error?: { message?: string } };
+
+function normalize(rawPhone: string): string {
+  const cleaned = rawPhone.replace(/\s/g, "");
+  return cleaned.startsWith("+33")
+    ? cleaned
+    : `+33${cleaned.replace(/^0/, "")}`;
+}
+
+async function postApi<T>(
+  path: string,
+  body: unknown,
+): Promise<{ data?: T; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = (await res.json().catch(() => ({}))) as ApiEnvelope<T>;
+    if (!res.ok) {
+      return { error: json.error?.message ?? `Request failed (${res.status})` };
+    }
+    return { data: json.data };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Network error" };
+  }
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       onboardingDone: false,
       authed: false,
       signupDone: false,
+      authChoice: null,
       phone: "",
       loading: false,
 
@@ -37,96 +77,61 @@ export const useAuthStore = create<AuthState>()(
         set({ onboardingDone: true });
       },
 
-      sendOtp: async (phone: string) => {
-        set({ loading: true });
-        const normalized = phone.startsWith("+33")
-          ? phone
-          : `+33${phone.replace(/^0/, "")}`;
+      setAuthChoice: (choice) => {
+        set({ authChoice: choice });
+      },
 
+      sendOtp: async (rawPhone: string) => {
+        set({ loading: true });
+        const phone = normalize(rawPhone);
+
+        // Dev bypass: skip Prelude entirely, accept the constant code on verify.
         if (DEV_AUTH) {
-          set({ loading: false, phone: normalized });
+          set({ loading: false, phone });
           return {};
         }
 
-        const { error } = await supabase.auth.signInWithOtp({
-          phone: normalized,
-        });
-
+        const { error } = await postApi("/auth/send-code", { phone });
         set({ loading: false });
-        if (error) return { error: error.message };
-        return {};
+        return error ? { error } : {};
       },
 
-      verifyOtp: async (phone: string, code: string) => {
+      verifyOtp: async (rawPhone: string, code: string) => {
         set({ loading: true });
-        const normalized = phone.startsWith("+33")
-          ? phone
-          : `+33${phone.replace(/^0/, "")}`;
+        const phone = normalize(rawPhone);
 
-        if (DEV_AUTH) {
-          if (code !== DEV_OTP_CODE) {
-            set({ loading: false });
-            return { error: `Code invalide (utilise ${DEV_OTP_CODE} en dev)` };
-          }
-          try {
-            const res = await fetch(`${API_BASE}/auth/dev-signin`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ phone: normalized, code }),
-            });
-            const json = (await res.json()) as {
-              data?: {
-                access_token: string;
-                refresh_token: string;
-                user?: { id?: string };
-              };
-              error?: { message?: string };
-            };
-            if (!res.ok || !json.data) {
-              set({ loading: false });
-              return {
-                error: json.error?.message ?? `Dev sign-in failed (${res.status})`,
-              };
-            }
-            const { error: setErr, data: sessionData } =
-              await supabase.auth.setSession({
-                access_token: json.data.access_token,
-                refresh_token: json.data.refresh_token,
-              });
-            set({ loading: false });
-            if (setErr) return { error: setErr.message };
-
-            const isNewUser = !sessionData.user?.user_metadata?.name;
-            set({
-              authed: true,
-              phone: normalized,
-              signupDone: !isNewUser,
-            });
-            return { isNewUser };
-          } catch (e) {
-            set({ loading: false });
-            return {
-              error: e instanceof Error ? e.message : "Dev sign-in failed",
-            };
-          }
+        const endpoint = DEV_AUTH ? "/auth/dev-signin" : "/auth/verify-code";
+        if (DEV_AUTH && code !== DEV_OTP_CODE) {
+          set({ loading: false });
+          return { error: `Code invalide (utilise ${DEV_OTP_CODE} en dev)` };
         }
 
-        const { data, error } = await supabase.auth.verifyOtp({
-          phone: normalized,
-          token: code,
-          type: "sms",
+        const { data, error } = await postApi<SessionPayload>(endpoint, {
+          phone,
+          code,
         });
+        if (error || !data) {
+          set({ loading: false });
+          return { error: error ?? "Sign-in failed" };
+        }
 
-        set({ loading: false });
-        if (error) return { error: error.message };
+        const { error: sessionErr, data: sessionData } =
+          await supabase.auth.setSession({
+            access_token: data.access_token,
+            refresh_token: data.refresh_token,
+          });
+        if (sessionErr) {
+          set({ loading: false });
+          return { error: sessionErr.message };
+        }
 
-        // Check if user has a name set (i.e., not a new user)
-        const isNewUser = !data.user?.user_metadata?.name;
-
+        const isNewUser = !sessionData.user?.user_metadata?.name;
         set({
           authed: true,
-          phone: normalized,
+          phone,
           signupDone: !isNewUser,
+          authChoice: null,
+          loading: false,
         });
         return { isNewUser };
       },
@@ -137,7 +142,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         await supabase.auth.signOut();
-        set({ authed: false, signupDone: false, phone: "" });
+        set({ authed: false, signupDone: false, phone: "", authChoice: null });
       },
 
       restoreSession: async () => {
@@ -160,6 +165,7 @@ export const useAuthStore = create<AuthState>()(
         onboardingDone: state.onboardingDone,
         authed: state.authed,
         signupDone: state.signupDone,
+        authChoice: state.authChoice,
         phone: state.phone,
       }),
     },

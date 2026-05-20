@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
 import AuthFlow from "@/components/auth/AuthFlow";
+import AuthIndex from "@/components/auth/AuthIndex";
 import SignupForm from "@/components/auth/SignupForm";
 import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 import AnimatedSplash from "@/components/splash/AnimatedSplash";
@@ -25,6 +26,7 @@ export default function RootLayout(): React.ReactNode {
   const onboardingDone = useAuthStore((s) => s.onboardingDone);
   const authed = useAuthStore((s) => s.authed);
   const signupDone = useAuthStore((s) => s.signupDone);
+  const authChoice = useAuthStore((s) => s.authChoice);
   const phone = useAuthStore((s) => s.phone);
   const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
   const completeSignup = useAuthStore((s) => s.completeSignup);
@@ -67,6 +69,15 @@ export default function RootLayout(): React.ReactNode {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="dark" />
         <OnboardingFlow onComplete={completeOnboarding} />
+      </GestureHandlerRootView>
+    );
+  }
+
+  if (!authed && !authChoice) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar style="dark" />
+        <AuthIndex />
       </GestureHandlerRootView>
     );
   }

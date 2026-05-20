@@ -16,6 +16,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SeedModule } from './modules/seed/seed.module';
 import { AuthDevModule } from './modules/auth-dev/auth-dev.module';
+import { AuthPreludeModule } from './modules/auth-prelude/auth-prelude.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AuthDevModule } from './modules/auth-dev/auth-dev.module';
     AnalyticsModule,
     SeedModule,
     AuthDevModule,
+    AuthPreludeModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SupabaseAuthGuard },

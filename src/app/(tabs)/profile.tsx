@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 import {
   Award,
   Bell,
@@ -47,6 +47,7 @@ export default function ProfileScreen(): React.ReactElement {
   const [saved, setSaved] = useState(false);
   const [phoneError, setPhoneError] = useState<string | undefined>();
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,21 +114,14 @@ export default function ProfileScreen(): React.ReactElement {
   const router = useRouter();
 
   const handleLogout = (): void => {
-    Alert.alert(
-      "Déconnexion",
-      "Tu veux vraiment te déconnecter ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Se déconnecter",
-          style: "destructive",
-          onPress: () => {
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            void logout();
-          },
-        },
-      ],
-    );
+    void Haptics.selectionAsync();
+    setLogoutOpen(true);
+  };
+
+  const confirmLogout = (): void => {
+    setLogoutOpen(false);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void logout();
   };
 
   return (
@@ -490,6 +484,159 @@ export default function ProfileScreen(): React.ReactElement {
           Pop's Villepinte - v1.0 - by Progix
         </Text>
       </View>
+
+      {/* ── LOGOUT MODAL ── */}
+      <Modal
+        visible={logoutOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setLogoutOpen(false)}
+      >
+        <Pressable
+          onPress={() => setLogoutOpen(false)}
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.55)",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 28,
+          }}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              backgroundColor: colors.white,
+              borderRadius: radius.xl,
+              paddingTop: 28,
+              paddingBottom: 20,
+              paddingHorizontal: 24,
+              alignItems: "center",
+              ...shadow.float,
+            }}
+          >
+            {/* Icon bubble */}
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 32,
+                backgroundColor: "rgba(227,0,15,0.10)",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 16,
+              }}
+            >
+              <LogOut size={28} color={colors.accent} strokeWidth={2.5} />
+            </View>
+
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: font.display,
+                fontSize: 32,
+                lineHeight: 34,
+                letterSpacing: 1,
+                color: colors.ink,
+                textAlign: "center",
+              }}
+            >
+              DECONNEXION
+            </Text>
+
+            {/* Body */}
+            <Text
+              style={{
+                fontFamily: font.bodyMedium,
+                fontSize: 14,
+                lineHeight: 20,
+                color: colors.inkMuted,
+                textAlign: "center",
+                marginTop: 10,
+                maxWidth: 280,
+              }}
+            >
+              Tu veux vraiment te deconnecter ? Tu pourras te reconnecter quand tu veux.
+            </Text>
+
+            {/* Divider */}
+            <View
+              style={{
+                width: 32,
+                height: 3,
+                backgroundColor: colors.primary,
+                borderRadius: 2,
+                marginTop: 20,
+                marginBottom: 24,
+              }}
+            />
+
+            {/* Actions */}
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 10,
+                alignSelf: "stretch",
+              }}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Annuler"
+                onPress={() => setLogoutOpen(false)}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  backgroundColor: "transparent",
+                  borderRadius: radius.pill,
+                  paddingVertical: 15,
+                  alignItems: "center",
+                  borderWidth: 2,
+                  borderColor: colors.ink,
+                  opacity: pressed ? 0.7 : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    fontFamily: font.bodyBold,
+                    fontSize: 13,
+                    letterSpacing: 1.2,
+                    color: colors.ink,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Annuler
+                </Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Confirmer la deconnexion"
+                onPress={confirmLogout}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  backgroundColor: colors.accent,
+                  borderRadius: radius.pill,
+                  paddingVertical: 15,
+                  alignItems: "center",
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    fontFamily: font.bodyBold,
+                    fontSize: 13,
+                    letterSpacing: 1.2,
+                    color: colors.white,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Deconnexion
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }

@@ -88,6 +88,14 @@ export default function AuthFlow({
   const sendOtp = useAuthStore((s) => s.sendOtp);
   const verifyOtp = useAuthStore((s) => s.verifyOtp);
   const loading = useAuthStore((s) => s.loading);
+  const authChoice = useAuthStore((s) => s.authChoice);
+  const setAuthChoice = useAuthStore((s) => s.setAuthChoice);
+
+  const isRegister = authChoice === "register";
+  const phoneTitle = isRegister ? "INSCRIPTION" : "CONNEXION";
+  const phoneSubtitle = isRegister
+    ? "Crée ton compte en un éclair. Pas de spam, promis."
+    : "Entre ton numéro pour commander. Pas de spam, promis.";
 
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
@@ -287,11 +295,28 @@ export default function AuthFlow({
         overflow: "hidden",
       }}
     >
+      {/* Header with back arrow */}
+      <View
+        style={{
+          paddingHorizontal: 32,
+          paddingTop: insets.top + 16,
+          zIndex: 15,
+        }}
+      >
+        <Pressable
+          onPress={() => setAuthChoice(null)}
+          hitSlop={16}
+          accessibilityLabel="Retour"
+        >
+          <ArrowLeft size={28} color={colors.ink} strokeWidth={2.5} />
+        </Pressable>
+      </View>
+
       {/* Form content */}
       <View
         style={{
           paddingHorizontal: 32,
-          paddingTop: insets.top + 60,
+          paddingTop: 24,
           zIndex: 10,
         }}
       >
@@ -304,7 +329,7 @@ export default function AuthFlow({
             color: colors.ink,
           }}
         >
-          CONNEXION
+          {phoneTitle}
         </Text>
 
         <Text
@@ -316,7 +341,7 @@ export default function AuthFlow({
             maxWidth: 280,
           }}
         >
-          Entre ton numéro pour commander. Pas de spam, promis.
+          {phoneSubtitle}
         </Text>
 
         <View
