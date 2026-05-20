@@ -1,8 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type LayoutChangeEvent, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { Search as SearchIcon } from "lucide-react-native";
-import Animated, { LinearTransition } from "react-native-reanimated";
+import {
+  ChevronsRight,
+  Search as SearchIcon,
+  UtensilsCrossed,
+} from "lucide-react-native";
+import Animated, {
+  cancelAnimation,
+  Easing,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import FloatingCartBar from "@/components/cart/FloatingCartBar";
@@ -15,9 +28,54 @@ import CategoryRail, {
 import MenuSectionTitle from "@/components/menu/MenuSectionTitle";
 import ProductRow from "@/components/menu/ProductRow";
 import SearchField, { normalizeSearch } from "@/components/menu/SearchField";
-import { colors, font, radius } from "@/constants/theme";
+import { colors, font } from "@/constants/theme";
 import { useDeferredMount } from "@/hooks/useDeferredMount";
 import { useMenuStore } from "@/store/menu.store";
+
+function CategoryScrollHint(): React.ReactElement {
+  const nudge = useSharedValue(0);
+  useEffect(() => {
+    nudge.value = withRepeat(
+      withSequence(
+        withTiming(4, { duration: 700, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0, { duration: 700, easing: Easing.inOut(Easing.quad) }),
+      ),
+      -1,
+    );
+    return () => cancelAnimation(nudge);
+  }, [nudge]);
+
+  const arrowStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: nudge.value }],
+  }));
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "center",
+        gap: 6,
+        paddingTop: 2,
+        paddingBottom: 8,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: font.body,
+          fontSize: 10.5,
+          letterSpacing: 0.5,
+          color: colors.inkMuted,
+        }}
+      >
+        Glisse pour voir d'autres catégories
+      </Text>
+      <Animated.View style={arrowStyle}>
+        <ChevronsRight size={12} color={colors.inkMuted} strokeWidth={2.2} />
+      </Animated.View>
+    </View>
+  );
+}
 
 export default function MenuScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
@@ -113,12 +171,33 @@ export default function MenuScreen(): React.ReactElement {
           paddingTop: insets.top + 12,
           paddingBottom: 8,
           flexDirection: "row",
-          alignItems: "flex-start",
+          alignItems: "center",
           justifyContent: "space-between",
         }}
       >
         {!searchExpanded ? (
-          <View style={{ flex: 1, paddingRight: 16 }}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 4,
+              }}
+            >
+              <UtensilsCrossed size={16} color={colors.primary} strokeWidth={2.5} />
+              <Text
+                style={{
+                  fontFamily: font.bodySemi,
+                  fontSize: 13,
+                  color: colors.primary,
+                  letterSpacing: 1,
+                  textTransform: "uppercase",
+                }}
+              >
+                Toute la carte
+              </Text>
+            </View>
             <Text
               style={{
                 fontFamily: font.display,
@@ -130,53 +209,10 @@ export default function MenuScreen(): React.ReactElement {
             >
               MENU
             </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                marginTop: 4,
-              }}
-            >
-              <View
-                style={{
-                  backgroundColor: colors.primary,
-                  borderRadius: radius.pill,
-                  paddingHorizontal: 10,
-                  paddingVertical: 3,
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: font.bodyBold,
-                    fontSize: 11,
-                    color: colors.ink,
-                    letterSpacing: 1,
-                  }}
-                >
-                  {CATEGORIES.length} categories
-                </Text>
-              </View>
-              <Text
-                style={{
-                  fontFamily: font.bodyMedium,
-                  fontSize: 13,
-                  color: colors.inkMuted,
-                }}
-              >
-                {PRODUCTS.length} produits
-              </Text>
-            </View>
           </View>
         ) : null}
 
-        <View
-          style={
-            searchExpanded
-              ? { flex: 1 }
-              : { paddingTop: 8 }
-          }
-        >
+        <View style={searchExpanded ? { flex: 1 } : undefined}>
           <SearchField
             value={query}
             onChangeText={setQuery}
@@ -200,6 +236,7 @@ export default function MenuScreen(): React.ReactElement {
         {patternReady ? (
           <FoodPattern height={contentHeight} opacity={0.12} density="sparse" />
         ) : null}
+      {!isSearching && CATEGORIES.length > 4 ? <CategoryScrollHint /> : null}
       {PRODUCTS.length === 0 && menuLoading ? (
         <View style={{ paddingTop: 8 }}>
           {Array.from({ length: 6 }).map((_, i) => (
@@ -275,7 +312,7 @@ export default function MenuScreen(): React.ReactElement {
               {products.map((p, idx) => (
                 <ProductRow key={p.id} product={p} index={idx} />
               ))}
-              <View style={{ height: 24 }} />
+              <View style={{ height: 12 }} />
             </View>
           ))}
         </View>

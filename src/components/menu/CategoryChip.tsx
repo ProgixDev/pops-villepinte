@@ -18,7 +18,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { colors } from "@/constants/theme";
+import { colors, font } from "@/constants/theme";
 import type { Category } from "@/types";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -68,24 +68,24 @@ export default function CategoryChip({
       onPressOut={() => {
         pressScale.value = withTiming(1, { duration: 160 });
       }}
-      className={`flex-row items-center rounded-lg ${
+      className={`flex-row items-center rounded-full ${
         selected ? "bg-secondary-container" : "bg-surface-container-high"
       }`}
       style={[
         {
-          paddingHorizontal: 20,
-          paddingVertical: 14,
-          gap: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 9,
+          gap: 7,
         },
         animatedStyle,
       ]}
     >
-      <Icon size={18} color={iconColor} strokeWidth={2} />
+      <Icon size={15} color={iconColor} strokeWidth={2.2} />
       <Text
-        className={`font-sans-bold ${
+        className={
           selected ? "text-on-secondary-container" : "text-on-surface"
-        }`}
-        style={{ fontSize: 14 }}
+        }
+        style={{ fontFamily: font.bodyBold, fontSize: 12.5, letterSpacing: 0.2 }}
       >
         {category.name}
       </Text>

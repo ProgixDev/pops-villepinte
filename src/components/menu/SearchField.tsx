@@ -13,9 +13,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { colors } from "@/constants/theme";
+import { colors, font } from "@/constants/theme";
 
-const COLLAPSED_SIZE = 48;
+const COLLAPSED_SIZE = 40;
 const HORIZONTAL_PADDING = 48; // 24 each side of the screen
 const ANIMATION_MS = 250;
 
@@ -61,7 +61,7 @@ export default function SearchField({
         className="bg-surface-container-high items-center justify-center rounded-full"
         style={{ width: COLLAPSED_SIZE, height: COLLAPSED_SIZE }}
       >
-        <Search size={20} color={colors.ink} strokeWidth={2} />
+        <Search size={18} color={colors.ink} strokeWidth={2} />
       </Pressable>
     );
   }
@@ -72,13 +72,13 @@ export default function SearchField({
       style={[
         {
           height: COLLAPSED_SIZE,
-          paddingHorizontal: 20,
-          gap: 12,
+          paddingHorizontal: 16,
+          gap: 10,
         },
         animatedStyle,
       ]}
     >
-      <Search size={20} color={colors.ink} strokeWidth={2} />
+      <Search size={18} color={colors.ink} strokeWidth={2} />
       <TextInput
         autoFocus
         value={value}
@@ -86,8 +86,8 @@ export default function SearchField({
         placeholder="Cherchez votre envie..."
         placeholderTextColor={colors.inkMuted}
         returnKeyType="search"
-        className="flex-1 font-sans text-on-surface"
-        style={{ fontSize: 15, paddingVertical: 0 }}
+        className="flex-1 text-on-surface"
+        style={{ fontFamily: font.body, fontSize: 14, paddingVertical: 0 }}
       />
       <Pressable
         accessibilityRole="button"

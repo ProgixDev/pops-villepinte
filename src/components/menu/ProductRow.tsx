@@ -1,5 +1,5 @@
 import { memo, useEffect } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
@@ -13,7 +13,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 
 import { ROUTES } from "@/constants/routes";
-import { colors } from "@/constants/theme";
+import { colors, font } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
 import type { Product } from "@/types";
@@ -106,13 +106,19 @@ function ProductRow({
       }}
       className="flex-row items-center"
       style={[
-        { paddingHorizontal: 24, paddingVertical: 16, gap: 16 },
+        {
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          gap: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
         containerStyle,
       ]}
     >
       <View
-        className="bg-surface-container-highest rounded-lg overflow-hidden"
-        style={{ width: 112, height: 112 }}
+        className="bg-surface-container-highest rounded-xl overflow-hidden"
+        style={{ width: 88, height: 88 }}
       >
         <Image
           source={product.image_url}
@@ -123,55 +129,75 @@ function ProductRow({
           style={{ width: "100%", height: "100%" }}
           accessibilityIgnoresInvertColors
         />
+        {firstTag !== undefined ? (
+          <View
+            style={{
+              position: "absolute",
+              top: 6,
+              left: 6,
+              backgroundColor: colors.primary,
+              borderRadius: 999,
+              paddingHorizontal: 7,
+              paddingVertical: 2,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: font.bodyBold,
+                fontSize: 8.5,
+                letterSpacing: 1.4,
+                color: colors.ink,
+              }}
+            >
+              {firstTag}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <View
-        className="flex-1 justify-between"
-        style={{ minHeight: 112, paddingVertical: 4 }}
+        className="flex-1"
+        style={{ minHeight: 88, justifyContent: "space-between", paddingVertical: 2 }}
       >
         <View>
-          {firstTag !== undefined ? (
-            <View
-              className="bg-primary self-start rounded-full"
-              style={{ paddingHorizontal: 8, paddingVertical: 2, marginBottom: 6 }}
-            >
-              <Text
-                className="font-sans-bold"
-                style={{
-                  fontSize: 9,
-                  letterSpacing: 2,
-                  color: colors.surface,
-                }}
-              >
-                {firstTag}
-              </Text>
-            </View>
-          ) : null}
-
           <Text
-            numberOfLines={2}
-            className="font-sans-bold text-on-surface"
-            style={{ fontSize: 17, lineHeight: 22, letterSpacing: -0.3 }}
+            numberOfLines={1}
+            className="text-on-surface"
+            style={{
+              fontFamily: font.bodyBold,
+              fontSize: 16,
+              lineHeight: 20,
+              letterSpacing: -0.2,
+            }}
           >
             {product.name}
           </Text>
 
           <Text
-            numberOfLines={1}
-            className="font-sans text-on-surface-variant"
-            style={{ fontSize: 13, lineHeight: 18, marginTop: 2 }}
+            numberOfLines={2}
+            className="text-on-surface-variant"
+            style={{
+              fontFamily: font.body,
+              fontSize: 12,
+              lineHeight: 16,
+              marginTop: 2,
+            }}
           >
             {product.description}
           </Text>
         </View>
 
         <View
-          className="flex-row items-end justify-between"
-          style={{ marginTop: "auto" }}
+          className="flex-row items-center justify-between"
+          style={{ marginTop: 6 }}
         >
           <Text
-            className="font-sans-extrabold-italic text-primary"
-            style={{ fontSize: 22, lineHeight: 24 }}
+            className="text-primary"
+            style={{
+              fontFamily: font.bodyExtraBoldItalic,
+              fontSize: 19,
+              lineHeight: 22,
+            }}
           >
             {priceLabel}
           </Text>
@@ -190,11 +216,11 @@ function ProductRow({
             onPressOut={() => {
               addPressScale.value = withTiming(1, { duration: 160 });
             }}
-            hitSlop={8}
+            hitSlop={10}
             className="bg-on-surface items-center justify-center rounded-full"
-            style={[{ width: 36, height: 36 }, addButtonStyle]}
+            style={[{ width: 32, height: 32 }, addButtonStyle]}
           >
-            <Plus size={18} color={colors.surface} strokeWidth={2.5} />
+            <Plus size={16} color={colors.surface} strokeWidth={2.5} />
           </AnimatedPressable>
         </View>
       </View>

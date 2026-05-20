@@ -110,16 +110,15 @@ export function SkeletonProductRow(): React.ReactElement {
       style={{
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 24,
-        paddingVertical: 16,
-        gap: 16,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        gap: 14,
       }}
     >
-      <Skeleton width={112} height={112} radius={radius.lg} />
-      <View style={{ flex: 1, minHeight: 112, justifyContent: "space-between" }}>
-        <View style={{ gap: 8 }}>
-          <Skeleton width={48} height={14} radius={radius.pill} />
-          <Skeleton width="80%" height={18} radius={6} />
+      <Skeleton width={88} height={88} radius={radius.lg} />
+      <View style={{ flex: 1, minHeight: 88, justifyContent: "space-between" }}>
+        <View style={{ gap: 6 }}>
+          <Skeleton width="70%" height={16} radius={6} />
           <Skeleton width="95%" height={12} radius={6} />
         </View>
         <View
@@ -127,10 +126,11 @@ export function SkeletonProductRow(): React.ReactElement {
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
+            marginTop: 6,
           }}
         >
-          <Skeleton width={64} height={20} radius={6} />
-          <Skeleton width={36} height={36} radius={18} />
+          <Skeleton width={56} height={18} radius={6} />
+          <Skeleton width={32} height={32} radius={16} />
         </View>
       </View>
     </View>

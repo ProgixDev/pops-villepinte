@@ -26,14 +26,19 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { colors, font, radius } from "@/constants/theme";
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
-// BlurView intensity per platform — Android needs a higher value to look
-// equivalent to iOS at the same perceived strength.
-const BLUR_INTENSITY = Platform.OS === "android" ? 70 : 40;
+// Per-platform blur tuning. iOS uses a system material tint that the OS
+// renders with the same backdrop pipeline as native liquid glass, so the
+// fallback on pre-iOS 26 looks ~indistinguishable from the GlassView branch.
+// Android's BlurView can't access system materials, so it gets a higher
+// intensity + a stronger white overlay to compensate.
+const BLUR_INTENSITY = Platform.OS === "android" ? 80 : 70;
+const BLUR_TINT: "systemThinMaterialLight" | "light" =
+  Platform.OS === "ios" ? "systemThinMaterialLight" : "light";
 
 /**
  * Glass container that renders true iOS 26 liquid glass when supported, and
- * falls back to a frosted BlurView + subtle tint everywhere else. Same visual
- * language across platforms.
+ * falls back to a frosted BlurView tuned to mimic the same look everywhere
+ * else.
  */
 function GlassContainer({
   children,
@@ -52,8 +57,11 @@ function GlassContainer({
   return (
     <BlurView
       intensity={BLUR_INTENSITY}
-      tint="light"
-      style={[styles.blurFallback, style]}
+      tint={BLUR_TINT}
+      style={[
+        Platform.OS === "ios" ? styles.blurFallbackIos : styles.blurFallbackAndroid,
+        style,
+      ]}
     >
       {children}
     </BlurView>
@@ -278,10 +286,18 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 16,
   },
-  // Subtle white tint + hairline border layered ON TOP of the BlurView for
-  // platforms without native iOS 26 liquid glass. Low opacity so the blurred
-  // content beneath actually shows through.
-  blurFallback: {
+  // iOS pre-liquid-glass: the `systemThinMaterialLight` tint already mimics
+  // Apple's native glass material, so we only need a hint of overlay to give
+  // the bar a slight body. Heavier overlay would obscure the blurred content
+  // and break the glass illusion.
+  blurFallbackIos: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.55)",
+  },
+  // Android BlurView lacks system materials, so we add a stronger white wash
+  // + a hairline border to fake the same frosted-glass feel.
+  blurFallbackAndroid: {
     backgroundColor: "rgba(255,255,255,0.35)",
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.6)",

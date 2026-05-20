@@ -56,9 +56,9 @@ export default function CategoryRail({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
-          paddingHorizontal: 24,
-          paddingVertical: 12,
-          gap: 10,
+          paddingHorizontal: 20,
+          paddingVertical: 8,
+          gap: 8,
         }}
       >
         {items.map((cat, index) => (

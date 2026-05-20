@@ -12,6 +12,10 @@ export default function TabLayout(): React.ReactNode {
         headerShown: false,
         tabBarActiveTintColor: colors.ink,
         tabBarInactiveTintColor: colors.inkMuted,
+        // Horizontal slide between tabs. Direction is derived from the tab
+        // order declared below: moving to a higher-indexed tab slides the new
+        // screen in from the right; moving lower slides it in from the left.
+        animation: "shift",
       }}
     >
       <Tabs.Screen

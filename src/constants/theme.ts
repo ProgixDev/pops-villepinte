@@ -43,6 +43,7 @@ export const font = {
   bodyMedium: "Poppins_500Medium",
   bodySemi: "Poppins_600SemiBold",
   bodyBold: "Poppins_700Bold",
+  bodyExtraBoldItalic: "Poppins_800ExtraBold_Italic",
 } as const;
 
 export const shadow = {

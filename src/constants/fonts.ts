@@ -8,6 +8,7 @@ import {
   Poppins_500Medium,
   Poppins_600SemiBold,
   Poppins_700Bold,
+  Poppins_800ExtraBold_Italic,
 } from "@expo-google-fonts/poppins";
 
 export function useAppFonts(): boolean {
@@ -17,6 +18,7 @@ export function useAppFonts(): boolean {
     Poppins_500Medium,
     Poppins_600SemiBold,
     Poppins_700Bold,
+    Poppins_800ExtraBold_Italic,
   });
 
   return bebasLoaded && poppinsLoaded;

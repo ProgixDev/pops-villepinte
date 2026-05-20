@@ -26,6 +26,7 @@ module.exports = {
         "sans-medium": ["Poppins_500Medium"],
         "sans-semibold": ["Poppins_600SemiBold"],
         "sans-bold": ["Poppins_700Bold"],
+        "sans-extrabold-italic": ["Poppins_800ExtraBold_Italic"],
       },
       borderRadius: {
         sm: "8px",
