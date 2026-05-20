@@ -29,6 +29,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowLeft,
+  Check,
   ChevronRight,
   CornerDownLeft,
   Crosshair,
@@ -67,6 +68,10 @@ export default function DeliveryPickerScreen(): React.ReactElement {
   const cameraRef = useRef<CameraHandle | null>(null);
   const lastReverseSeq = useRef(0);
   const lastSearchSeq = useRef(0);
+  // Mirror of the live map centre — updated synchronously from
+  // onCameraChanged so handleLockSpot is never reading a stale value
+  // (e.g. tapping the pill before onMapIdle's React state update lands).
+  const liveCenterRef = useRef({ lat: 0, lng: 0 });
 
   // Initial centre: incoming params (current GPS from checkout) ➜ storefront.
   const initialCoords = useMemo(() => {
@@ -77,16 +82,38 @@ export default function DeliveryPickerScreen(): React.ReactElement {
   }, [params.lat, params.lng]);
 
   const [center, setCenter] = useState(initialCoords);
+  // Initial sync: liveCenterRef starts equal to initialCoords.
+  if (liveCenterRef.current.lat === 0 && liveCenterRef.current.lng === 0) {
+    liveCenterRef.current = initialCoords;
+  }
   const [centerLabel, setCenterLabel] = useState<string | null>(null);
   const [centerLoading, setCenterLoading] = useState(true);
   const [centerAddress, setCenterAddress] =
     useState<DeliveryAddress | null>(null);
   const [moving, setMoving] = useState(false);
 
+  // Two-step flow: the pin only "locks" when the user taps the floating
+  // "Sélectionner cet emplacement" button (or picks a search suggestion).
+  // The bottom Confirmer button uses selectedSpot, never the live center.
+  const [selectedSpot, setSelectedSpot] = useState<{
+    lat: number;
+    lng: number;
+    address: DeliveryAddress | null;
+  } | null>(null);
+  const [locking, setLocking] = useState(false);
+
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<DeliveryAddress[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // Selection is "fresh" when the on-screen pin coincides with the locked
+  // selectedSpot. Tolerance is generous so float drift from Mapbox's idle
+  // callback doesn't accidentally flip the button to "stale" after locking.
+  const centerMatchesSelection =
+    selectedSpot !== null &&
+    Math.abs(selectedSpot.lat - center.lat) < 5e-5 &&
+    Math.abs(selectedSpot.lng - center.lng) < 5e-5;
 
   const distanceKm = useMemo(
     () => distanceFromStoreKm(center.lat, center.lng),
@@ -170,11 +197,57 @@ export default function DeliveryPickerScreen(): React.ReactElement {
     Keyboard.dismiss();
     flyTo(addr.lat, addr.lng, 16);
     // Optimistic: pretend the centre is now exactly that address so the
-    // bottom card updates instantly while the map animates.
+    // bottom card updates instantly while the map animates. Search picks are
+    // explicit, so we also lock them immediately — no extra tap needed.
+    liveCenterRef.current = { lat: addr.lat, lng: addr.lng };
     setCenter({ lat: addr.lat, lng: addr.lng });
     setCenterAddress(addr);
     setCenterLabel(addr.label);
     setCenterLoading(false);
+    setSelectedSpot({ lat: addr.lat, lng: addr.lng, address: addr });
+  };
+
+  // Top floating button — locks the LIVE pin position (from the ref, so it
+  // can't ever fall behind the React state update from onMapIdle).
+  const handleLockSpot = async () => {
+    if (locking) return;
+    setLocking(true);
+    void Haptics.selectionAsync();
+    const liveLat = liveCenterRef.current.lat;
+    const liveLng = liveCenterRef.current.lng;
+
+    // Reverse-geocode the live position; if a previous geocode for these
+    // exact coords already cached an address we reuse it, otherwise we hit
+    // Mapbox now and await it.
+    let resolved: DeliveryAddress | null = null;
+    if (
+      centerAddress &&
+      Math.abs(centerAddress.lat - liveLat) < 1e-5 &&
+      Math.abs(centerAddress.lng - liveLng) < 1e-5
+    ) {
+      resolved = centerAddress;
+    } else {
+      try {
+        resolved = await mapboxReverseGeocode(liveLat, liveLng);
+      } catch {
+        resolved = null;
+      }
+    }
+
+    setSelectedSpot({
+      lat: liveLat,
+      lng: liveLng,
+      address: resolved,
+    });
+    // Pin state and selection MUST line up exactly, otherwise tiny float
+    // drift from later onCameraChanged callbacks keeps `centerMatchesSelection`
+    // false and the Confirmer stays gray after locking.
+    setCenter({ lat: liveLat, lng: liveLng });
+    if (resolved) {
+      setCenterAddress(resolved);
+      setCenterLabel(resolved.label);
+    }
+    setLocking(false);
   };
 
   const handleRecenterOnMe = async () => {
@@ -191,25 +264,63 @@ export default function DeliveryPickerScreen(): React.ReactElement {
     }
   };
 
-  const handleConfirm = () => {
+  const [confirming, setConfirming] = useState(false);
+
+  const handleConfirm = async () => {
+    if (confirming || !selectedSpot) return;
+    setConfirming(true);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Resolve the label if it wasn't captured at lock time (e.g. offline).
+    let resolved = selectedSpot.address;
+    if (!resolved) {
+      try {
+        resolved = await mapboxReverseGeocode(
+          selectedSpot.lat,
+          selectedSpot.lng,
+        );
+      } catch {
+        resolved = null;
+      }
+    }
+
     const finalLabel =
-      centerAddress?.label ??
-      centerLabel ??
-      `Lat ${center.lat.toFixed(5)}, Lng ${center.lng.toFixed(5)}`;
+      resolved?.label ??
+      `Lat ${selectedSpot.lat.toFixed(5)}, Lng ${selectedSpot.lng.toFixed(5)}`;
     setPicked({
       label: finalLabel,
-      lat: center.lat,
-      lng: center.lng,
-      postcode: centerAddress?.postcode,
-      city: centerAddress?.city,
+      lat: selectedSpot.lat,
+      lng: selectedSpot.lng,
+      postcode: resolved?.postcode,
+      city: resolved?.city,
     });
+    setConfirming(false);
     router.back();
+  };
+
+  // Values shown in the bottom card — always reflect the LOCKED selection,
+  // not the live pin position.
+  const cardDistanceKm = selectedSpot
+    ? distanceFromStoreKm(selectedSpot.lat, selectedSpot.lng)
+    : distanceKm;
+  const cardFee = computeDeliveryFee(cardDistanceKm, baseFee, perKmRate);
+  const cardLabel = selectedSpot
+    ? (selectedSpot.address?.label ??
+        `Lat ${selectedSpot.lat.toFixed(5)}, Lng ${selectedSpot.lng.toFixed(5)}`)
+    : null;
+
+  // Keep the live ref in lockstep with the camera. onCameraChanged fires on
+  // every frame of pan/zoom/animation — cheap, no React state churn.
+  const onCameraChanged = (state: MapState) => {
+    const [lng, lat] = state.properties.center as [number, number];
+    liveCenterRef.current = { lat, lng };
+    if (!moving) setMoving(true);
   };
 
   const onMapIdle = (state: MapState) => {
     setMoving(false);
     const [lng, lat] = state.properties.center as [number, number];
+    liveCenterRef.current = { lat, lng };
     if (
       Math.abs(lat - center.lat) < 1e-6 &&
       Math.abs(lng - center.lng) < 1e-6
@@ -228,7 +339,7 @@ export default function DeliveryPickerScreen(): React.ReactElement {
         attributionPosition={{ bottom: 120, right: 8 }}
         logoPosition={{ bottom: 120, left: 8 }}
         scaleBarEnabled={false}
-        onCameraChanged={() => setMoving(true)}
+        onCameraChanged={onCameraChanged}
         onMapIdle={onMapIdle}
       >
         <Camera
@@ -494,12 +605,23 @@ export default function DeliveryPickerScreen(): React.ReactElement {
               width: 44,
               height: 44,
               borderRadius: 22,
-              backgroundColor: colors.primary,
+              backgroundColor:
+                selectedSpot && centerMatchesSelection
+                  ? colors.primary
+                  : "#F0F0F0",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <MapPin size={20} color={colors.ink} strokeWidth={2.5} />
+            <MapPin
+              size={20}
+              color={
+                selectedSpot && centerMatchesSelection
+                  ? colors.ink
+                  : colors.inkMuted
+              }
+              strokeWidth={2.5}
+            />
           </View>
           <View style={{ flex: 1 }}>
             <Text
@@ -507,27 +629,31 @@ export default function DeliveryPickerScreen(): React.ReactElement {
                 fontFamily: font.bodyBold,
                 fontSize: 10,
                 letterSpacing: 1.5,
-                color: colors.inkMuted,
+                color:
+                  selectedSpot && !centerMatchesSelection
+                    ? colors.accent
+                    : colors.inkMuted,
                 textTransform: "uppercase",
               }}
             >
-              {centerLoading
-                ? "Recherche de l'adresse…"
-                : `Adresse choisie · ${distanceKm.toFixed(1)} km`}
+              {!selectedSpot
+                ? "Aucune adresse sélectionnée"
+                : !centerMatchesSelection
+                  ? "Tu as bougé · sélectionne pour mettre à jour"
+                  : `Adresse choisie · ${cardDistanceKm.toFixed(1)} km`}
             </Text>
             <Text
               numberOfLines={2}
               style={{
                 fontFamily: font.bodyBold,
                 fontSize: 15,
-                color: colors.ink,
+                color: selectedSpot ? colors.ink : colors.inkMuted,
                 marginTop: 4,
               }}
             >
-              {centerLoading
-                ? "—"
-                : centerLabel ??
-                  `Point (${center.lat.toFixed(5)}, ${center.lng.toFixed(5)})`}
+              {selectedSpot
+                ? cardLabel ?? "—"
+                : "Glisse la carte, puis sélectionne ta position."}
             </Text>
           </View>
         </View>
@@ -540,56 +666,133 @@ export default function DeliveryPickerScreen(): React.ReactElement {
             marginBottom: 14,
           }}
         >
-          <Pill icon={CornerDownLeft} label="Glisse la carte pour ajuster" />
-          <Text
-            style={{
-              fontFamily: font.bodyBold,
-              fontSize: 12,
-              color: colors.ink,
-              letterSpacing: 0.5,
-            }}
-          >
-            +{previewFee.toFixed(2).replace(".", ",")}€
-          </Text>
+          <Pill
+            icon={CornerDownLeft}
+            label={
+              selectedSpot
+                ? "Tu peux ajuster en bougeant la carte"
+                : "Glisse la carte pour pointer un lieu"
+            }
+          />
+          {selectedSpot ? (
+            <Text
+              style={{
+                fontFamily: font.bodyBold,
+                fontSize: 12,
+                color: colors.ink,
+                letterSpacing: 0.5,
+              }}
+            >
+              +{cardFee.toFixed(2).replace(".", ",")}€
+            </Text>
+          ) : null}
         </View>
 
+        {/* Step 1 — lock the current pin. Stays visible whenever the pin
+            doesn't match the locked spot (covers "no selection yet" and
+            "user has moved the map" cases alike). */}
+        {!centerMatchesSelection ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Sélectionner cette position"
+            onPress={() => void handleLockSpot()}
+            disabled={locking}
+            style={({ pressed }) => ({
+              backgroundColor: colors.ink,
+              borderRadius: radius.lg,
+              paddingVertical: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              marginBottom: 10,
+              opacity: pressed || locking ? 0.92 : 1,
+            })}
+          >
+            <View
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 11,
+                backgroundColor: colors.primary,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {locking ? (
+                <ActivityIndicator size="small" color={colors.ink} />
+              ) : (
+                <Check size={13} color={colors.ink} strokeWidth={3} />
+              )}
+            </View>
+            <Text
+              style={{
+                fontFamily: font.bodyBold,
+                fontSize: 13,
+                letterSpacing: 1.5,
+                color: colors.primary,
+                textTransform: "uppercase",
+              }}
+            >
+              {locking
+                ? "Sélection…"
+                : selectedSpot
+                  ? "Sélectionner cette position"
+                  : "Sélectionner cette position"}
+            </Text>
+          </Pressable>
+        ) : null}
+
         <Pressable
-          onPress={handleConfirm}
-          disabled={centerLoading}
+          onPress={() => void handleConfirm()}
+          disabled={
+            confirming || !selectedSpot || !centerMatchesSelection
+          }
           accessibilityRole="button"
           accessibilityLabel="Confirmer cette adresse"
-          style={({ pressed }) => ({
-            backgroundColor: centerLoading ? "#E8E8E8" : colors.primary,
-            borderRadius: radius.lg,
-            paddingVertical: 16,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 10,
-            opacity: pressed ? 0.92 : 1,
-            ...(centerLoading
-              ? {}
-              : {
-                  shadowColor: colors.ink,
-                  shadowOpacity: 0.18,
-                  shadowRadius: 16,
-                  shadowOffset: { width: 0, height: 8 },
-                  elevation: 6,
-                }),
-          })}
+          style={({ pressed }) => {
+            const inactive =
+              confirming || !selectedSpot || !centerMatchesSelection;
+            return {
+              backgroundColor: inactive ? "#E8E8E8" : colors.primary,
+              borderRadius: radius.lg,
+              paddingVertical: 16,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              opacity: pressed ? 0.92 : 1,
+              ...(inactive
+                ? {}
+                : {
+                    shadowColor: colors.ink,
+                    shadowOpacity: 0.18,
+                    shadowRadius: 16,
+                    shadowOffset: { width: 0, height: 8 },
+                    elevation: 6,
+                  }),
+            };
+          }}
         >
           <Text
             style={{
               fontFamily: font.bodyBold,
               fontSize: 14,
               letterSpacing: 1,
-              color: centerLoading ? colors.inkMuted : colors.ink,
+              color:
+                confirming || !selectedSpot || !centerMatchesSelection
+                  ? colors.inkMuted
+                  : colors.ink,
               textTransform: "uppercase",
             }}
           >
-            {centerLoading
-                ? "Calcul de l'adresse…"
-                : "Confirmer cette adresse"}
+            {confirming
+              ? "Enregistrement…"
+              : !selectedSpot
+                ? "Sélectionne d'abord ta position"
+                : !centerMatchesSelection
+                  ? "Sélectionne la nouvelle position"
+                  : "Confirmer cette adresse"}
           </Text>
         </Pressable>
       </View>
