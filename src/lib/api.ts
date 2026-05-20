@@ -81,6 +81,8 @@ export const menuApi = {
   getSupplements: () => api<Supplement[]>("/menu/supplements"),
   getSignatures: () => api<Product[]>("/menu/signatures"),
   getAdvice: () => api<Product[]>("/menu/advice"),
+  getAccompagnements: () =>
+    api<Accompagnement[]>("/accompagnements"),
   getShopSettings: () => api<ShopSettings>("/menu/shop-settings"),
 };
 
@@ -145,6 +147,15 @@ export type ShopSettings = {
   updated_at: string;
 };
 
+export type Accompagnement = {
+  id: string;
+  name: string;
+  price_eur: number;
+  image_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+};
+
 export type ProfileData = {
   id: string;
   name: string;
@@ -157,7 +168,8 @@ export type ProfileData = {
 export type CreateOrderPayload = {
   customerName: string;
   items: {
-    productId: string;
+    productId?: string;
+    accompagnementId?: string;
     variantId?: string;
     quantity: number;
     supplements?: string[];
@@ -168,7 +180,8 @@ export type CreateOrderPayload = {
 
 export type OrderItemData = {
   id: string;
-  product_id: string;
+  product_id: string | null;
+  accompagnement_id: string | null;
   variant_id: string | null;
   quantity: number;
   unit_price_eur: number;

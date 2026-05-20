@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { colors } from "@/constants/theme";
+import { colors, font } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import {
   getLineUnitPrice,
@@ -147,8 +147,12 @@ export default function CartItemRow({
   const removeItem = useCartStore((s) => s.removeItem);
   const getProductById = useMenuStore((s) => s.getProductById);
   const getSupplementById = useMenuStore((s) => s.getSupplementById);
+  const accompagnements = useMenuStore((s) => s.accompagnements);
 
-  const product = getProductById(item.productId);
+  const product = item.productId ? getProductById(item.productId) : undefined;
+  const accompagnement = item.accompagnementId
+    ? accompagnements.find((a) => a.id === item.accompagnementId)
+    : undefined;
   const variant =
     item.variantId !== undefined
       ? product?.product_variants?.find((v) => v.id === item.variantId)
@@ -164,15 +168,17 @@ export default function CartItemRow({
       .join(", ");
   }, [item.supplements, getSupplementById]);
 
-  if (!product) {
+  const displayName = product?.name ?? accompagnement?.name ?? null;
+  const displayImage = product?.image_url ?? accompagnement?.image_url ?? null;
+
+  if (!displayName) {
     // Stale item — silently ignore. Cart store handles cleanup.
     return null;
   }
 
   const handleSwipeOpen = (): void => {
-    const name = product.name;
     removeItem(item.id);
-    if (onDeleted !== undefined) onDeleted(name);
+    if (onDeleted !== undefined) onDeleted(displayName);
   };
 
   return (
@@ -191,7 +197,7 @@ export default function CartItemRow({
           style={{ width: 84, height: 84 }}
         >
           <Image
-            source={product.image_url}
+            source={displayImage ?? undefined}
             contentFit="cover"
             style={{ width: "100%", height: "100%" }}
             accessibilityIgnoresInvertColors
@@ -201,16 +207,24 @@ export default function CartItemRow({
         <View className="flex-1">
           <Text
             numberOfLines={2}
-            className="font-sans-bold text-on-surface"
-            style={{ fontSize: 16, lineHeight: 20 }}
+            style={{
+              fontFamily: font.bodyBold,
+              fontSize: 15,
+              lineHeight: 20,
+              color: colors.ink,
+            }}
           >
-            {product.name}
+            {displayName}
           </Text>
 
           {variant !== undefined ? (
             <Text
-              className="font-sans-semibold text-primary"
-              style={{ fontSize: 12, marginTop: 2 }}
+              style={{
+                fontFamily: font.bodySemi,
+                fontSize: 12,
+                marginTop: 2,
+                color: colors.primaryDark,
+              }}
             >
               · {variant.label}
             </Text>
@@ -219,8 +233,12 @@ export default function CartItemRow({
           {supplementsLabel !== null ? (
             <Text
               numberOfLines={1}
-              className="font-sans text-on-surface-variant"
-              style={{ fontSize: 12, marginTop: 2 }}
+              style={{
+                fontFamily: font.body,
+                fontSize: 12,
+                marginTop: 2,
+                color: colors.inkMuted,
+              }}
             >
               {supplementsLabel}
             </Text>
@@ -234,8 +252,12 @@ export default function CartItemRow({
               <Pencil size={11} color={colors.inkMuted} strokeWidth={2} />
               <Text
                 numberOfLines={1}
-                className="font-sans text-on-surface-variant"
-                style={{ fontSize: 12, fontStyle: "italic" }}
+                style={{
+                  fontFamily: font.body,
+                  fontSize: 12,
+                  fontStyle: "italic",
+                  color: colors.inkMuted,
+                }}
               >
                 {item.notes}
               </Text>

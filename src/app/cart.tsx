@@ -8,9 +8,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import IconButton from "@/components/common/IconButton";
 import Toast from "@/components/common/Toast";
+import CartAccompagnementCard from "@/components/cart/CartAccompagnementCard";
 import CartEmpty from "@/components/cart/CartEmpty";
 import CartItemRow from "@/components/cart/CartItemRow";
-import CartSuggestionCard from "@/components/cart/CartSuggestionCard";
 import CartTotals from "@/components/cart/CartTotals";
 import { ROUTES } from "@/constants/routes";
 import { colors } from "@/constants/theme";
@@ -25,8 +25,7 @@ export default function CartScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const items = useCartStore((s) => s.items);
   const total = useCartStore((s) => s.totalEUR());
-  const PRODUCTS = useMenuStore((s) => s.products);
-  const ADVICE = useMenuStore((s) => s.advice);
+  const ACCOMPAGNEMENTS = useMenuStore((s) => s.accompagnements);
 
   const [toastVisible, setToastVisible] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string>("");
@@ -37,10 +36,15 @@ export default function CartScreen(): React.ReactElement {
   );
 
   const suggestions = useMemo(() => {
-    const inCart = new Set(items.map((i) => i.productId));
-    const pool = ADVICE.length > 0 ? ADVICE : PRODUCTS;
-    return pool.filter((p) => !inCart.has(p.id)).slice(0, SUGGESTIONS_MAX);
-  }, [items, PRODUCTS, ADVICE]);
+    const inCart = new Set(
+      items
+        .map((i) => i.accompagnementId)
+        .filter((id): id is string => Boolean(id)),
+    );
+    return ACCOMPAGNEMENTS.filter(
+      (a) => a.is_active && !inCart.has(a.id),
+    ).slice(0, SUGGESTIONS_MAX);
+  }, [items, ACCOMPAGNEMENTS]);
 
   const handleItemDeleted = (productName: string): void => {
     setToastMessage(`${productName} retiré du panier`);
@@ -170,8 +174,8 @@ export default function CartScreen(): React.ReactElement {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
             >
-              {suggestions.map((p) => (
-                <CartSuggestionCard key={p.id} product={p} />
+              {suggestions.map((a) => (
+                <CartAccompagnementCard key={a.id} accompagnement={a} />
               ))}
             </ScrollView>
           </View>
@@ -202,17 +206,15 @@ export default function CartScreen(): React.ReactElement {
 
       {/* STICKY CTA */}
       <View
+        pointerEvents="box-none"
         style={{
           position: "absolute",
           bottom: 0,
           left: 0,
           right: 0,
-          backgroundColor: colors.white,
           paddingHorizontal: 20,
           paddingTop: 12,
           paddingBottom: Math.max(insets.bottom, 16) + 8,
-          borderTopWidth: 1,
-          borderTopColor: "#F0F0F0",
         }}
       >
         <Pressable

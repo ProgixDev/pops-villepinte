@@ -31,19 +31,47 @@ export class OrdersService {
   ) {}
 
   async createOrder(userId: string, dto: CreateOrderDto) {
-    // 1. Collect all unique product IDs, variant IDs, supplement IDs
-    const productIds = [...new Set(dto.items.map((i) => i.productId))];
+    // 1. Split items by kind and collect referenced ids
+    const productItems = dto.items.filter((i) => !i.accompagnementId);
+    const accItems = dto.items.filter((i) => i.accompagnementId);
+
+    for (const item of dto.items) {
+      const hasProduct = Boolean(item.productId);
+      const hasAcc = Boolean(item.accompagnementId);
+      if (hasProduct === hasAcc) {
+        throw new BadRequestException(
+          'Each cart item must reference either productId or accompagnementId',
+        );
+      }
+    }
+
+    const productIds = [
+      ...new Set(productItems.map((i) => i.productId!)),
+    ];
+    const accompagnementIds = [
+      ...new Set(accItems.map((i) => i.accompagnementId!)),
+    ];
     const variantIds = [
-      ...new Set(dto.items.filter((i) => i.variantId).map((i) => i.variantId!)),
+      ...new Set(
+        productItems.filter((i) => i.variantId).map((i) => i.variantId!),
+      ),
     ];
     const supplementIds = [
-      ...new Set(dto.items.flatMap((i) => i.supplements ?? [])),
+      ...new Set(productItems.flatMap((i) => i.supplements ?? [])),
     ];
 
     // 2. Fetch all referenced entities
-    const [productsRes, variantsRes, supplementsRes, junctionRes] =
+    const [productsRes, accRes, variantsRes, supplementsRes, junctionRes] =
       await Promise.all([
-        this.supabase.from('products').select('*').in('id', productIds),
+        productIds.length > 0
+          ? this.supabase.from('products').select('*').in('id', productIds)
+          : { data: [] as any[], error: null },
+        accompagnementIds.length > 0
+          ? this.supabase
+              .from('accompagnements')
+              .select('*')
+              .in('id', accompagnementIds)
+          : { data: [] as any[], error: null },
         variantIds.length > 0
           ? this.supabase
               .from('product_variants')
@@ -66,11 +94,13 @@ export class OrdersService {
       ]);
 
     if (productsRes.error) throw productsRes.error;
+    if (accRes.error) throw accRes.error;
     if (variantsRes.error) throw variantsRes.error;
     if (supplementsRes.error) throw supplementsRes.error;
     if (junctionRes.error) throw junctionRes.error;
 
     const productsMap = new Map(productsRes.data!.map((p) => [p.id, p]));
+    const accMap = new Map(accRes.data!.map((a) => [a.id, a]));
     const variantsMap = new Map(variantsRes.data!.map((v) => [v.id, v]));
     const supplementsMap = new Map(supplementsRes.data!.map((s) => [s.id, s]));
     const junctionSet = new Set(
@@ -82,7 +112,8 @@ export class OrdersService {
     // 3. Validate and calculate prices
     let maxPrepTime = 0;
     const orderItems: Array<{
-      product_id: string;
+      product_id: string | null;
+      accompagnement_id: string | null;
       variant_id: string | null;
       quantity: number;
       unit_price_eur: number;
@@ -92,7 +123,33 @@ export class OrdersService {
     }> = [];
 
     for (const item of dto.items) {
-      const product = productsMap.get(item.productId);
+      if (item.accompagnementId) {
+        const acc = accMap.get(item.accompagnementId);
+        if (!acc) {
+          throw new BadRequestException(
+            `Accompagnement ${item.accompagnementId} not found`,
+          );
+        }
+        if (!acc.is_active) {
+          throw new BadRequestException(
+            `Accompagnement "${acc.name}" is not available`,
+          );
+        }
+        const unitPrice = Number(acc.price_eur);
+        orderItems.push({
+          product_id: null,
+          accompagnement_id: acc.id,
+          variant_id: null,
+          quantity: item.quantity,
+          unit_price_eur: unitPrice,
+          line_total_eur: unitPrice * item.quantity,
+          supplements: [],
+          notes: item.notes ?? null,
+        });
+        continue;
+      }
+
+      const product = productsMap.get(item.productId!);
       if (!product) {
         throw new BadRequestException(
           `Product ${item.productId} not found`,
@@ -149,7 +206,8 @@ export class OrdersService {
       );
 
       orderItems.push({
-        product_id: item.productId,
+        product_id: item.productId!,
+        accompagnement_id: null,
         variant_id: item.variantId ?? null,
         quantity: item.quantity,
         unit_price_eur: unitPrice,
@@ -198,6 +256,7 @@ export class OrdersService {
         orderItems.map((item) => ({
           order_id: order.id,
           product_id: item.product_id,
+          accompagnement_id: item.accompagnement_id,
           variant_id: item.variant_id,
           quantity: item.quantity,
           unit_price_eur: item.unit_price_eur,

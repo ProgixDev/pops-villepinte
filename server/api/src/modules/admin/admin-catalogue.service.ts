@@ -16,9 +16,13 @@ import { ReorderCategoriesDto } from './dto/reorder-categories.dto';
 import { CreateSupplementDto } from './dto/create-supplement.dto';
 import { UpdateSupplementDto } from './dto/update-supplement.dto';
 import { ManageProductSupplementsDto } from './dto/manage-product-supplements.dto';
+import { ManageProductVariantsDto } from './dto/manage-product-variants.dto';
 import { SetHomeSignaturesDto } from './dto/set-home-signatures.dto';
 import { SetHomeAdviceDto } from './dto/set-home-advice.dto';
 import { UpdateShopSettingsDto } from './dto/update-shop-settings.dto';
+import { CreateAccompagnementDto } from './dto/create-accompagnement.dto';
+import { UpdateAccompagnementDto } from './dto/update-accompagnement.dto';
+import { ACCOMPAGNEMENT_SELECT } from '../accompagnements/accompagnements.service';
 
 @Injectable()
 export class AdminCatalogueService {
@@ -66,9 +70,10 @@ export class AdminCatalogueService {
 
   // Products
   async createProduct(dto: CreateProductDto) {
+    const row = this.normalizeProductPayload(dto);
     const { data, error } = await this.supabase
       .from('products')
-      .insert(dto)
+      .insert(row)
       .select()
       .single();
 
@@ -77,15 +82,26 @@ export class AdminCatalogueService {
   }
 
   async updateProduct(id: string, dto: UpdateProductDto) {
+    const row = this.normalizeProductPayload(dto);
     const { data, error } = await this.supabase
       .from('products')
-      .update({ ...dto, updated_at: new Date().toISOString() })
+      .update({ ...row, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw new NotFoundException('Product not found');
     return data;
+  }
+
+  // The schema column is `image_path` but the API surface uses `image_url`
+  // (aliased on read) — accept either on write and translate to the column.
+  private normalizeProductPayload<T extends { image_url?: string }>(
+    dto: T,
+  ): Omit<T, 'image_url'> & { image_path?: string | null } {
+    const { image_url, ...rest } = dto;
+    if (image_url === undefined) return rest as never;
+    return { ...rest, image_path: image_url || null } as never;
   }
 
   async deleteProduct(id: string) {
@@ -96,10 +112,11 @@ export class AdminCatalogueService {
       .eq('product_id', id);
 
     if (count && count > 0) {
-      // Soft delete
+      // Soft delete via availability flag — the products table tracks
+      // visibility on is_available; there is no is_active column.
       const { data, error } = await this.supabase
         .from('products')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .update({ is_available: false, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();
@@ -130,6 +147,42 @@ export class AdminCatalogueService {
 
     if (error) throw new NotFoundException('Product not found');
     return data;
+  }
+
+  async setProductVariants(id: string, dto: ManageProductVariantsDto) {
+    // Verify product exists so we surface a 404 rather than an opaque error.
+    const { data: product, error: productError } = await this.supabase
+      .from('products')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+    if (productError) throw productError;
+    if (!product) throw new NotFoundException('Product not found');
+
+    await this.supabase
+      .from('product_variants')
+      .delete()
+      .eq('product_id', id);
+
+    if (dto.variants.length === 0) {
+      return { product_id: id, variants: [] };
+    }
+
+    const rows = dto.variants.map((v, idx) => ({
+      id: v.id && v.id.length > 0 ? v.id : `${id}-v${idx + 1}`,
+      product_id: id,
+      label: v.label,
+      price_eur: v.price_eur,
+      sort: v.sort ?? idx,
+    }));
+
+    const { data, error } = await this.supabase
+      .from('product_variants')
+      .insert(rows)
+      .select();
+
+    if (error) throw error;
+    return { product_id: id, variants: data ?? [] };
   }
 
   async setProductSupplements(id: string, dto: ManageProductSupplementsDto) {
@@ -169,9 +222,10 @@ export class AdminCatalogueService {
   }
 
   async updateCategory(id: string, dto: UpdateCategoryDto) {
+    // categories has no updated_at column — pass dto through unchanged.
     const { data, error } = await this.supabase
       .from('categories')
-      .update({ ...dto, updated_at: new Date().toISOString() })
+      .update(dto)
       .eq('id', id)
       .select()
       .single();
@@ -227,9 +281,10 @@ export class AdminCatalogueService {
   }
 
   async updateSupplement(id: string, dto: UpdateSupplementDto) {
+    // supplements has no updated_at column — pass dto through unchanged.
     const { data, error } = await this.supabase
       .from('supplements')
-      .update({ ...dto, updated_at: new Date().toISOString() })
+      .update(dto)
       .eq('id', id)
       .select()
       .single();
@@ -394,5 +449,93 @@ export class AdminCatalogueService {
 
     if (error) throw error;
     return data;
+  }
+
+  // Accompagnements (drinks / simple sides — shown in mobile cart "Notre conseil")
+  async listAccompagnements() {
+    const { data, error } = await this.supabase
+      .from('accompagnements')
+      .select(ACCOMPAGNEMENT_SELECT)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  }
+
+  async getAccompagnement(id: string) {
+    const { data, error } = await this.supabase
+      .from('accompagnements')
+      .select(ACCOMPAGNEMENT_SELECT)
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new NotFoundException('Accompagnement not found');
+    return data;
+  }
+
+  async createAccompagnement(dto: CreateAccompagnementDto) {
+    const { data, error } = await this.supabase
+      .from('accompagnements')
+      .insert(dto)
+      .select(ACCOMPAGNEMENT_SELECT)
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new ConflictException(
+          'Un accompagnement avec cet identifiant existe déjà',
+        );
+      }
+      throw error;
+    }
+    return data;
+  }
+
+  async updateAccompagnement(id: string, dto: UpdateAccompagnementDto) {
+    const { data, error } = await this.supabase
+      .from('accompagnements')
+      .update({ ...dto, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select(ACCOMPAGNEMENT_SELECT)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new NotFoundException('Accompagnement not found');
+    return data;
+  }
+
+  async deleteAccompagnement(id: string) {
+    // Best-effort: delete the image from storage too. We ignore the result
+    // because the row delete is the authoritative action and a missing object
+    // shouldn't block it.
+    const { data: existing } = await this.supabase
+      .from('accompagnements')
+      .select('image_path')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (existing?.image_path) {
+      const key = this.extractStorageKey(existing.image_path, 'accompagnements');
+      if (key) {
+        await this.supabase.storage.from('accompagnements').remove([key]);
+      }
+    }
+
+    const { error } = await this.supabase
+      .from('accompagnements')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return { deleted: true };
+  }
+
+  // Public URL → storage key for the named bucket. Returns null when the URL
+  // does not belong to the bucket (e.g. an external image).
+  private extractStorageKey(publicUrl: string, bucket: string): string | null {
+    const marker = `/storage/v1/object/public/${bucket}/`;
+    const idx = publicUrl.indexOf(marker);
+    if (idx === -1) return null;
+    return publicUrl.slice(idx + marker.length);
   }
 }

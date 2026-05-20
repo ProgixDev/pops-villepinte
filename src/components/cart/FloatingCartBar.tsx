@@ -18,6 +18,12 @@ import { useCartStore } from "@/store/cart.store";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+// Mirror of FloatingTabBar metrics so the cart pill clears the liquid-glass
+// tab bar with a consistent gap. If those change, update here too.
+const TAB_BAR_HEIGHT = 68;
+const TAB_BAR_BOTTOM_OFFSET = 12;
+const CART_BAR_GAP_ABOVE_TABS = 12;
+
 export default function FloatingCartBar(): React.ReactElement | null {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -58,7 +64,10 @@ export default function FloatingCartBar(): React.ReactElement | null {
         position: "absolute",
         left: 20,
         right: 20,
-        bottom: insets.bottom + 20,
+        bottom:
+          Math.max(insets.bottom, TAB_BAR_BOTTOM_OFFSET) +
+          TAB_BAR_HEIGHT +
+          CART_BAR_GAP_ABOVE_TABS,
       }}
     >
       <AnimatedPressable

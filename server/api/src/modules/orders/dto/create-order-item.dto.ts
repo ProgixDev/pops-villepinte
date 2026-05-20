@@ -11,10 +11,20 @@ import {
 } from 'class-validator';
 
 export class CreateOrderItemDto {
+  // Either productId or accompagnementId is set, never both. Validated in the
+  // service so the message is meaningful, since class-validator's "one of"
+  // story is awkward.
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(100)
-  productId: string;
+  productId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  accompagnementId?: string;
 
   @IsOptional()
   @IsString()

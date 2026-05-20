@@ -34,6 +34,7 @@ export default function OrdersScreen(): React.ReactElement {
       for (const item of order.items) {
         addItem({
           productId: item.productId,
+          accompagnementId: item.accompagnementId,
           variantId: item.variantId,
           quantity: item.quantity,
           supplements: item.supplements,

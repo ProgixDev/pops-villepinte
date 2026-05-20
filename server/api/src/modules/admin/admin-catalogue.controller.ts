@@ -19,9 +19,12 @@ import { ReorderCategoriesDto } from './dto/reorder-categories.dto';
 import { CreateSupplementDto } from './dto/create-supplement.dto';
 import { UpdateSupplementDto } from './dto/update-supplement.dto';
 import { ManageProductSupplementsDto } from './dto/manage-product-supplements.dto';
+import { ManageProductVariantsDto } from './dto/manage-product-variants.dto';
 import { SetHomeSignaturesDto } from './dto/set-home-signatures.dto';
 import { SetHomeAdviceDto } from './dto/set-home-advice.dto';
 import { UpdateShopSettingsDto } from './dto/update-shop-settings.dto';
+import { CreateAccompagnementDto } from './dto/create-accompagnement.dto';
+import { UpdateAccompagnementDto } from './dto/update-accompagnement.dto';
 
 @Controller('admin')
 @UseGuards(AdminGuard)
@@ -79,6 +82,14 @@ export class AdminCatalogueController {
     @Body() dto: ManageProductSupplementsDto,
   ) {
     return this.catalogueService.setProductSupplements(id, dto);
+  }
+
+  @Put('products/:id/variants')
+  setProductVariants(
+    @Param('id') id: string,
+    @Body() dto: ManageProductVariantsDto,
+  ) {
+    return this.catalogueService.setProductVariants(id, dto);
   }
 
   // Categories
@@ -149,5 +160,34 @@ export class AdminCatalogueController {
   @Put('shop/settings')
   updateShopSettings(@Body() dto: UpdateShopSettingsDto) {
     return this.catalogueService.updateShopSettings(dto);
+  }
+
+  // Accompagnements (drinks / simple sides)
+  @Get('accompagnements')
+  listAccompagnements() {
+    return this.catalogueService.listAccompagnements();
+  }
+
+  @Get('accompagnements/:id')
+  getAccompagnement(@Param('id') id: string) {
+    return this.catalogueService.getAccompagnement(id);
+  }
+
+  @Post('accompagnements')
+  createAccompagnement(@Body() dto: CreateAccompagnementDto) {
+    return this.catalogueService.createAccompagnement(dto);
+  }
+
+  @Patch('accompagnements/:id')
+  updateAccompagnement(
+    @Param('id') id: string,
+    @Body() dto: UpdateAccompagnementDto,
+  ) {
+    return this.catalogueService.updateAccompagnement(id, dto);
+  }
+
+  @Delete('accompagnements/:id')
+  deleteAccompagnement(@Param('id') id: string) {
+    return this.catalogueService.deleteAccompagnement(id);
   }
 }

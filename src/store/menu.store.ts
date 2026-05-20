@@ -2,7 +2,12 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { menuApi } from "@/lib/api";
-import type { Category, Product, Supplement } from "@/types";
+import type {
+  Accompagnement,
+  Category,
+  Product,
+  Supplement,
+} from "@/types";
 
 import { asyncStorageAdapter } from "./_storage";
 
@@ -12,6 +17,7 @@ type MenuState = {
   supplements: Supplement[];
   signatures: Product[];
   advice: Product[];
+  accompagnements: Accompagnement[];
   loading: boolean;
   error: string | null;
   fetchMenu: () => Promise<void>;
@@ -29,26 +35,35 @@ export const useMenuStore = create<MenuState>()(
       supplements: [],
       signatures: [],
       advice: [],
+      accompagnements: [],
       loading: false,
       error: null,
 
       fetchMenu: async () => {
         set({ loading: true, error: null });
         try {
-          const [categories, products, supplements, signaturesResult, adviceResult] =
-            await Promise.all([
-              menuApi.getCategories(),
-              menuApi.getProducts(),
-              menuApi.getSupplements(),
-              menuApi.getSignatures().catch(() => [] as unknown[]),
-              menuApi.getAdvice().catch(() => [] as unknown[]),
-            ]);
+          const [
+            categories,
+            products,
+            supplements,
+            signaturesResult,
+            adviceResult,
+            accompagnementsResult,
+          ] = await Promise.all([
+            menuApi.getCategories(),
+            menuApi.getProducts(),
+            menuApi.getSupplements(),
+            menuApi.getSignatures().catch(() => [] as unknown[]),
+            menuApi.getAdvice().catch(() => [] as unknown[]),
+            menuApi.getAccompagnements().catch(() => [] as unknown[]),
+          ]);
           set({
             categories: categories as unknown as Category[],
             products: products as unknown as Product[],
             supplements: supplements as unknown as Supplement[],
             signatures: signaturesResult as unknown as Product[],
             advice: adviceResult as unknown as Product[],
+            accompagnements: accompagnementsResult as unknown as Accompagnement[],
             loading: false,
           });
         } catch (e: unknown) {
@@ -88,8 +103,9 @@ export const useMenuStore = create<MenuState>()(
         supplements: s.supplements,
         signatures: s.signatures,
         advice: s.advice,
+        accompagnements: s.accompagnements,
       }),
-      version: 1,
+      version: 2,
     },
   ),
 );

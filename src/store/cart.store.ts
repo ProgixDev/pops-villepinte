@@ -8,7 +8,8 @@ import { asyncStorageAdapter } from "./_storage";
 import { useMenuStore } from "./menu.store";
 
 export type AddCartItemInput = {
-  productId: string;
+  productId?: string;
+  accompagnementId?: string;
   variantId?: string;
   quantity: number;
   supplements: string[];
@@ -27,11 +28,21 @@ type CartState = {
 };
 
 /**
- * Unit price for a single cart-line: product variant (or base) + supplements.
- * Uses the menu store for live product data.
+ * Unit price for a single cart-line: product variant (or base) + supplements,
+ * or the flat price of an accompagnement.
+ * Uses the menu store for live catalogue data.
  */
 export function getLineUnitPrice(item: CartItem): number {
   const menuState = useMenuStore.getState();
+
+  if (item.accompagnementId) {
+    const acc = menuState.accompagnements.find(
+      (a) => a.id === item.accompagnementId,
+    );
+    return acc ? Number(acc.price_eur) : 0;
+  }
+
+  if (!item.productId) return 0;
   const product = menuState.getProductById(item.productId);
   if (!product) return 0;
 
@@ -54,10 +65,18 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
 
-      addItem: ({ productId, variantId, quantity, supplements, notes }) => {
+      addItem: ({
+        productId,
+        accompagnementId,
+        variantId,
+        quantity,
+        supplements,
+        notes,
+      }) => {
         const newItem: CartItem = {
           id: Crypto.randomUUID(),
           productId,
+          accompagnementId,
           variantId,
           quantity: Math.max(1, quantity),
           supplements,

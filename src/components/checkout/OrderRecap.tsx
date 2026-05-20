@@ -14,12 +14,18 @@ export type OrderRecapProps = {
 function RecapLine({ item }: { item: CartItem }): React.ReactElement | null {
   const getProductById = useMenuStore((s) => s.getProductById);
   const getSupplementById = useMenuStore((s) => s.getSupplementById);
-  const product = getProductById(item.productId);
-  if (!product) return null;
+  const accompagnements = useMenuStore((s) => s.accompagnements);
+
+  const product = item.productId ? getProductById(item.productId) : undefined;
+  const accompagnement = item.accompagnementId
+    ? accompagnements.find((a) => a.id === item.accompagnementId)
+    : undefined;
+  const displayName = product?.name ?? accompagnement?.name;
+  if (!displayName) return null;
 
   const variant =
     item.variantId !== undefined
-      ? product.product_variants?.find((v) => v.id === item.variantId)
+      ? product?.product_variants?.find((v) => v.id === item.variantId)
       : undefined;
 
   const unitPrice = getLineUnitPrice(item);
@@ -33,7 +39,7 @@ function RecapLine({ item }: { item: CartItem }): React.ReactElement | null {
       .join(", ");
   }, [item.supplements, getSupplementById]);
 
-  const nameLabel = `${item.quantity}× ${product.name}${
+  const nameLabel = `${item.quantity}× ${displayName}${
     variant !== undefined ? ` · ${variant.label}` : ""
   }`;
 

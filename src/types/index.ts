@@ -36,7 +36,8 @@ export type Product = {
 
 export type CartItem = {
   id: string;
-  productId: string;
+  productId?: string;
+  accompagnementId?: string;
   variantId?: string;
   quantity: number;
   supplements: string[];
@@ -65,4 +66,13 @@ export type Profile = {
   name: string;
   phone: string;
   orderCount: number;
+};
+
+export type Accompagnement = {
+  id: string;
+  name: string;
+  price_eur: number;
+  image_url: string | null;
+  sort_order: number;
+  is_active: boolean;
 };

@@ -20,7 +20,8 @@ function toOrder(data: OrderData): Order {
     id: data.id,
     items: data.order_items.map((item) => ({
       id: item.id,
-      productId: item.product_id,
+      productId: item.product_id ?? undefined,
+      accompagnementId: item.accompagnement_id ?? undefined,
       variantId: item.variant_id ?? undefined,
       quantity: item.quantity,
       supplements: item.supplements.map((s) => s.id),
@@ -66,6 +67,7 @@ export const useOrdersStore = create<OrdersState>()(
           customerName,
           items: cartItems.map((item) => ({
             productId: item.productId,
+            accompagnementId: item.accompagnementId,
             variantId: item.variantId ?? undefined,
             quantity: item.quantity,
             supplements: item.supplements.length > 0 ? item.supplements : undefined,

@@ -36,6 +36,7 @@ export default function CheckoutScreen(): React.ReactElement {
   const updateName = useProfileStore((s) => s.updateName);
   const getProductById = useMenuStore((s) => s.getProductById);
   const getSupplementById = useMenuStore((s) => s.getSupplementById);
+  const accompagnements = useMenuStore((s) => s.accompagnements);
 
   const [name, setName] = useState<string>(
     isGuestName(profile.name) ? "" : profile.name,
@@ -62,8 +63,8 @@ export default function CheckoutScreen(): React.ReactElement {
     if (items.length === 0) return 0;
     const maxPrep = Math.max(
       ...items.map((i) => {
-        const p = getProductById(i.productId);
-        return p?.prep_time_minutes ?? 10;
+        const p = i.productId ? getProductById(i.productId) : undefined;
+        return p?.prep_time_minutes ?? 0;
       }),
     );
     return maxPrep + 2;
@@ -394,10 +395,16 @@ export default function CheckoutScreen(): React.ReactElement {
           </Text>
 
           {items.map((item) => {
-            const product = getProductById(item.productId);
-            if (!product) return null;
+            const product = item.productId
+              ? getProductById(item.productId)
+              : undefined;
+            const accompagnement = item.accompagnementId
+              ? accompagnements.find((a) => a.id === item.accompagnementId)
+              : undefined;
+            const displayName = product?.name ?? accompagnement?.name;
+            if (!displayName) return null;
             const variant = item.variantId
-              ? product.product_variants?.find((v) => v.id === item.variantId)
+              ? product?.product_variants?.find((v) => v.id === item.variantId)
               : undefined;
             const unitPrice = getLineUnitPrice(item);
             const lineTotal = unitPrice * item.quantity;
@@ -419,7 +426,7 @@ export default function CheckoutScreen(): React.ReactElement {
               >
                 <View style={{ flex: 1, paddingRight: 12 }}>
                   <Text style={{ fontFamily: font.bodySemi, fontSize: 14, color: colors.ink }}>
-                    {item.quantity}× {product.name}
+                    {item.quantity}× {displayName}
                     {variant ? ` · ${variant.label}` : ""}
                   </Text>
                   {supNames ? (
