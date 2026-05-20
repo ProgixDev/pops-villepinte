@@ -33,8 +33,22 @@ function toOrder(data: OrderData): Order {
     estimatedReadyAt: data.estimated_ready_at,
     pickedUpAt: data.picked_up_at ?? undefined,
     customerName: data.customer_name,
+    pickupMode: data.pickup_mode,
+    deliveryAddress: data.delivery_address ?? undefined,
+    deliveryLat: data.delivery_lat ?? undefined,
+    deliveryLng: data.delivery_lng ?? undefined,
+    deliveryFeeEUR: data.delivery_fee_eur,
   };
 }
+
+export type PlaceOrderDelivery =
+  | { pickupMode: "pickup" }
+  | {
+      pickupMode: "delivery";
+      address: string;
+      lat: number;
+      lng: number;
+    };
 
 type OrdersState = {
   active: Order | null;
@@ -44,6 +58,7 @@ type OrdersState = {
   placeOrder: (
     cartItems: CartItem[],
     customerName: string,
+    delivery?: PlaceOrderDelivery,
   ) => Promise<Order>;
   fetchOrders: () => Promise<void>;
   fetchOrderById: (id: string) => Promise<Order | null>;
@@ -60,7 +75,11 @@ export const useOrdersStore = create<OrdersState>()(
       loading: false,
       error: null,
 
-      placeOrder: async (cartItems: CartItem[], customerName: string) => {
+      placeOrder: async (
+        cartItems: CartItem[],
+        customerName: string,
+        delivery?: PlaceOrderDelivery,
+      ) => {
         set({ loading: true, error: null });
 
         const payload: CreateOrderPayload = {
@@ -74,6 +93,15 @@ export const useOrdersStore = create<OrdersState>()(
             notes: item.notes ?? undefined,
           })),
         };
+
+        if (delivery && delivery.pickupMode === "delivery") {
+          payload.pickupMode = "delivery";
+          payload.deliveryAddress = delivery.address;
+          payload.deliveryLat = delivery.lat;
+          payload.deliveryLng = delivery.lng;
+        } else {
+          payload.pickupMode = "pickup";
+        }
 
         try {
           const data = await ordersApi.create(payload);

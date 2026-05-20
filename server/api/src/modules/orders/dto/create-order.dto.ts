@@ -2,6 +2,9 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsIn,
+  IsLatitude,
+  IsLongitude,
   IsOptional,
   IsString,
   MaxLength,
@@ -29,4 +32,24 @@ export class CreateOrderDto {
   @IsString()
   @MaxLength(500)
   notes?: string;
+
+  // Delivery option — when omitted, default to pickup. The service performs the
+  // cross-field validation (address+coords required for delivery, forbidden for
+  // pickup) so the user gets a clean error rather than a 400 wall.
+  @IsOptional()
+  @IsIn(['pickup', 'delivery'])
+  pickupMode?: 'pickup' | 'delivery';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  deliveryAddress?: string;
+
+  @IsOptional()
+  @IsLatitude()
+  deliveryLat?: number;
+
+  @IsOptional()
+  @IsLongitude()
+  deliveryLng?: number;
 }

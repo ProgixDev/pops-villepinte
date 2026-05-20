@@ -13,6 +13,11 @@ import {
   recalculateOrderTotal,
 } from '../../common/utils/price';
 import {
+  DELIVERY_FEE_EUR,
+  DELIVERY_MAX_KM,
+  distanceFromStoreKm,
+} from '../../common/utils/delivery';
+import {
   ORDER_STATUS_TRANSITIONS,
   CUSTOMER_CANCELLABLE_STATUSES,
   ADMIN_CANCELLABLE_STATUSES,
@@ -31,6 +36,36 @@ export class OrdersService {
   ) {}
 
   async createOrder(userId: string, dto: CreateOrderDto) {
+    // 0. Resolve pickup vs delivery + fee. We do this up front so any user
+    // error surfaces before we waste round-trips fetching the catalogue.
+    const pickupMode: 'pickup' | 'delivery' = dto.pickupMode ?? 'pickup';
+    let deliveryFee = 0;
+    let deliveryAddress: string | null = null;
+    let deliveryLat: number | null = null;
+    let deliveryLng: number | null = null;
+
+    if (pickupMode === 'delivery') {
+      if (
+        !dto.deliveryAddress ||
+        dto.deliveryLat === undefined ||
+        dto.deliveryLng === undefined
+      ) {
+        throw new BadRequestException(
+          'Adresse de livraison incomplète — précise rue, latitude et longitude.',
+        );
+      }
+      const km = distanceFromStoreKm(dto.deliveryLat, dto.deliveryLng);
+      if (km > DELIVERY_MAX_KM) {
+        throw new BadRequestException(
+          `Adresse hors zone (~${km.toFixed(1)} km). Livraison max ${DELIVERY_MAX_KM} km.`,
+        );
+      }
+      deliveryFee = DELIVERY_FEE_EUR;
+      deliveryAddress = dto.deliveryAddress;
+      deliveryLat = dto.deliveryLat;
+      deliveryLng = dto.deliveryLng;
+    }
+
     // 1. Split items by kind and collect referenced ids
     const productItems = dto.items.filter((i) => !i.accompagnementId);
     const accItems = dto.items.filter((i) => i.accompagnementId);
@@ -221,12 +256,13 @@ export class OrdersService {
       }
     }
 
-    const totalEur = recalculateOrderTotal(
+    const itemsTotal = recalculateOrderTotal(
       orderItems.map((i) => ({
         unitPriceEur: i.unit_price_eur,
         quantity: i.quantity,
       })),
     );
+    const totalEur = itemsTotal + deliveryFee;
 
     // 4. Calculate estimated ready time
     const estimatedReadyAt = new Date(
@@ -243,6 +279,11 @@ export class OrdersService {
         status: 'received' as OrderStatus,
         estimated_ready_at: estimatedReadyAt,
         notes: dto.notes ?? null,
+        pickup_mode: pickupMode,
+        delivery_address: deliveryAddress,
+        delivery_lat: deliveryLat,
+        delivery_lng: deliveryLng,
+        delivery_fee_eur: deliveryFee,
       })
       .select()
       .single();

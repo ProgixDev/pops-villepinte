@@ -60,6 +60,11 @@ export type Order = {
   estimatedReadyAt: string;
   pickedUpAt?: string;
   customerName: string;
+  pickupMode?: "pickup" | "delivery";
+  deliveryAddress?: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
+  deliveryFeeEUR?: number;
 };
 
 export type Profile = {

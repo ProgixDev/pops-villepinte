@@ -176,6 +176,10 @@ export type CreateOrderPayload = {
     notes?: string;
   }[];
   notes?: string;
+  pickupMode?: "pickup" | "delivery";
+  deliveryAddress?: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
 };
 
 export type OrderItemData = {
@@ -201,4 +205,9 @@ export type OrderData = {
   notes: string | null;
   created_at: string;
   order_items: OrderItemData[];
+  pickup_mode?: "pickup" | "delivery";
+  delivery_address?: string | null;
+  delivery_lat?: number | null;
+  delivery_lng?: number | null;
+  delivery_fee_eur?: number;
 };
