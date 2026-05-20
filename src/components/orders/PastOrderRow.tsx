@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from "react-native";
-import { RefreshCw } from "lucide-react-native";
+import { ChevronRight, RefreshCw } from "lucide-react-native";
 
 import { colors, font, radius } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
@@ -26,23 +26,29 @@ const STATUS_LABELS: Record<string, { label: string; bg: string; color: string }
 export type PastOrderRowProps = {
   order: Order;
   onReorder: () => void;
+  onPress?: () => void;
 };
 
 export default function PastOrderRow({
   order,
   onReorder,
+  onPress,
 }: PastOrderRowProps): React.ReactElement {
   const itemCount = order.items.reduce((a, i) => a + i.quantity, 0);
   const statusConfig = STATUS_LABELS[order.status] ?? STATUS_LABELS.received!;
 
   return (
-    <View
-      style={{
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Voir les détails de la commande ${order.id}`}
+      onPress={onPress}
+      style={({ pressed }) => ({
         marginHorizontal: 20,
-        backgroundColor: "#FAFAFA",
+        backgroundColor: pressed ? "#F3F3F0" : "#FAFAFA",
         borderRadius: radius.lg,
         padding: 18,
-      }}
+        opacity: pressed ? 0.95 : 1,
+      })}
     >
       {/* Top row */}
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -94,37 +100,81 @@ export default function PastOrderRow({
         {itemCount} article{itemCount > 1 ? "s" : ""} · {formatPriceEUR(order.totalEUR)}
       </Text>
 
-      {/* Reorder */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Recommander la commande ${order.id}`}
-        onPress={onReorder}
-        hitSlop={12}
+      {/* Bottom row — reorder + explicit "open details" affordance */}
+      <View
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: 6,
+          justifyContent: "space-between",
+          gap: 12,
           marginTop: 14,
-          alignSelf: "flex-start",
-          backgroundColor: colors.primary,
-          borderRadius: radius.pill,
-          paddingHorizontal: 14,
-          paddingVertical: 8,
         }}
       >
-        <RefreshCw size={14} color={colors.ink} strokeWidth={2.5} />
-        <Text
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Recommander la commande ${order.id}`}
+          // stopPropagation so tapping the button doesn't also open the modal
+          onPress={(e) => {
+            e.stopPropagation();
+            onReorder();
+          }}
+          hitSlop={12}
           style={{
-            fontFamily: font.bodyBold,
-            fontSize: 12,
-            color: colors.ink,
-            letterSpacing: 1,
-            textTransform: "uppercase",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            backgroundColor: colors.primary,
+            borderRadius: radius.pill,
+            paddingHorizontal: 14,
+            paddingVertical: 8,
           }}
         >
-          Recommander
-        </Text>
-      </Pressable>
-    </View>
+          <RefreshCw size={14} color={colors.ink} strokeWidth={2.5} />
+          <Text
+            style={{
+              fontFamily: font.bodyBold,
+              fontSize: 12,
+              color: colors.ink,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+            }}
+          >
+            Recommander
+          </Text>
+        </Pressable>
+
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: font.bodyBold,
+              fontSize: 11,
+              color: colors.inkMuted,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+            }}
+          >
+            Détails
+          </Text>
+          <View
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              backgroundColor: colors.ink,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <ChevronRight size={16} color={colors.primary} strokeWidth={2.5} />
+          </View>
+        </View>
+      </View>
+    </Pressable>
   );
 }

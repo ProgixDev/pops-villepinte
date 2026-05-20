@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Package, Receipt } from "lucide-react-native";
@@ -7,12 +7,14 @@ import * as Haptics from "expo-haptics";
 import FloatingCartBar from "@/components/cart/FloatingCartBar";
 import Screen from "@/components/layout/Screen";
 import ActiveOrderCard from "@/components/orders/ActiveOrderCard";
+import OrderDetailsSheet from "@/components/orders/OrderDetailsSheet";
 import OrdersEmpty from "@/components/orders/OrdersEmpty";
 import PastOrderRow from "@/components/orders/PastOrderRow";
 import { ROUTES } from "@/constants/routes";
-import { colors, font, radius, shadow } from "@/constants/theme";
+import { colors, font, radius } from "@/constants/theme";
 import { useCartStore } from "@/store/cart.store";
 import { useOrdersStore } from "@/store/orders.store";
+import { useProfileStore } from "@/store/profile.store";
 import type { Order } from "@/types";
 
 export default function OrdersScreen(): React.ReactElement {
@@ -21,6 +23,8 @@ export default function OrdersScreen(): React.ReactElement {
   const history = useOrdersStore((s) => s.history);
   const fetchOrders = useOrdersStore((s) => s.fetchOrders);
   const addItem = useCartStore((s) => s.addItem);
+  const profilePhone = useProfileStore((s) => s.profile.phone);
+  const [detailsOrder, setDetailsOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     void fetchOrders();
@@ -232,6 +236,10 @@ export default function OrdersScreen(): React.ReactElement {
                 key={order.id}
                 order={order}
                 onReorder={() => handleReorder(order)}
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  setDetailsOrder(order);
+                }}
               />
             ))}
           </View>
@@ -269,6 +277,17 @@ export default function OrdersScreen(): React.ReactElement {
           Pop's Villepinte - Fait maison
         </Text>
       </View>
+
+      <OrderDetailsSheet
+        order={detailsOrder}
+        visible={detailsOrder !== null}
+        onClose={() => setDetailsOrder(null)}
+        onReorder={(o) => {
+          setDetailsOrder(null);
+          handleReorder(o);
+        }}
+        customerPhone={profilePhone}
+      />
     </Screen>
   );
 }
