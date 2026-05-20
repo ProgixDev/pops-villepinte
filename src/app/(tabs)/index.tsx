@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated as RNAnimated,
   Dimensions,
@@ -14,15 +14,20 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { Image } from "expo-image";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { ArrowRight, Heart } from "lucide-react-native";
 
 import FloatingCartBar from "@/components/cart/FloatingCartBar";
+import {
+  SkeletonHeroSlide,
+  SkeletonTopPickCard,
+} from "@/components/common/Skeleton";
 import Screen from "@/components/layout/Screen";
 import CategoryChip from "@/components/menu/CategoryChip";
 import { displayNameOrFallback } from "@/constants/profile";
 import { ROUTES } from "@/constants/routes";
 import { colors, font, radius } from "@/constants/theme";
+import { useDeferredMount } from "@/hooks/useDeferredMount";
 import { formatPriceEUR } from "@/lib/format";
 import { useMenuStore } from "@/store/menu.store";
 import { useProfileStore } from "@/store/profile.store";
@@ -324,13 +329,17 @@ export default function AccueilScreen(): React.ReactElement {
   const PRODUCTS = useMenuStore((s) => s.products);
   const CATEGORIES = useMenuStore((s) => s.categories);
   const SIGNATURES = useMenuStore((s) => s.signatures);
+  const menuLoading = useMenuStore((s) => s.loading);
   const fetchMenu = useMenuStore((s) => s.fetchMenu);
 
-  useFocusEffect(
-    useCallback(() => {
-      void fetchMenu();
-    }, [fetchMenu]),
-  );
+  // Root `_layout.tsx` already fetches the menu at app boot. Only refetch here
+  // as a defensive fallback when the store is empty (e.g. first install before
+  // the persisted cache hydrates). Refetching on every tab focus is what
+  // caused the 1-2s transition jank.
+  useEffect(() => {
+    if (PRODUCTS.length === 0) void fetchMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const heroProducts = useMemo<Product[]>(() => {
     if (SIGNATURES.length > 0) return SIGNATURES.slice(0, 3);
@@ -347,6 +356,12 @@ export default function AccueilScreen(): React.ReactElement {
   );
 
   const greetingName = displayNameOrFallback(name);
+
+  // Defer below-the-fold sections (top picks, nouveautés, story, footer) until
+  // after first paint so navigation into the home tab feels instant. Each of
+  // these sections includes an image-heavy ScrollView; mounting them all
+  // synchronously on cold start is what causes the freeze.
+  const heavyReady = useDeferredMount();
 
   return (
     <Screen floatingBottom={<FloatingCartBar />}>
@@ -391,11 +406,19 @@ export default function AccueilScreen(): React.ReactElement {
         </Text>
       </View>
 
-      {/* ── MARQUEE TAPE ── */}
-      <MarqueeTape />
+      {/* ── MARQUEE TAPE (deferred; placeholder reserves 42px to avoid layout shift) ── */}
+      {heavyReady ? (
+        <MarqueeTape />
+      ) : (
+        <View style={{ height: 42 }} />
+      )}
 
       {/* ── HERO SIGNATURE CAROUSEL ── */}
-      <SignatureCarousel products={heroProducts} />
+      {heroProducts.length > 0 && heavyReady ? (
+        <SignatureCarousel products={heroProducts} />
+      ) : (
+        <SkeletonHeroSlide />
+      )}
 
       {/* ── CATEGORIES ── */}
       <View style={{ marginTop: 24 }}>
@@ -443,6 +466,9 @@ export default function AccueilScreen(): React.ReactElement {
         </ScrollView>
       </View>
 
+      {/* Deferred sections — mount after first paint to keep navigation snappy. */}
+      {heavyReady ? (
+      <>
       {/* ── TOP PICKS ── */}
       <View style={{ marginTop: 24 }}>
         <View
@@ -504,7 +530,11 @@ export default function AccueilScreen(): React.ReactElement {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
         >
-          {topPicks.map((p) => (
+          {topPicks.length === 0 && menuLoading
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonTopPickCard key={`skel-top-${i}`} width={CARD_WIDTH} />
+              ))
+            : topPicks.map((p) => (
             <Pressable
               key={p.id}
               accessibilityRole="button"
@@ -715,6 +745,8 @@ export default function AccueilScreen(): React.ReactElement {
           Ouvert 11h – 00h · 06 51 30 XX XX
         </Text>
       </View>
+      </>
+      ) : null}
     </Screen>
   );
 }

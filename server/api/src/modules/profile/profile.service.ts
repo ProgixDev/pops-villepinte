@@ -34,6 +34,16 @@ export class ProfileService {
       .single();
 
     if (error) throw error;
+
+    // Mirror to auth.users.user_metadata.name so the JWT/session carries it.
+    // Clients reading session.user.user_metadata.name (e.g. mobile restoreSession)
+    // stay in sync without an extra API roundtrip.
+    if (dto.name) {
+      await this.supabase.auth.admin.updateUserById(userId, {
+        user_metadata: { name: dto.name },
+      });
+    }
+
     return {
       ...data,
       loyalty_tier: loyaltyTier(data.order_count),

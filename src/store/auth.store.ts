@@ -151,13 +151,17 @@ export const useAuthStore = create<AuthState>()(
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        if (session) {
-          set({
-            authed: true,
-            phone: session.user.phone ?? "",
-            signupDone: !!session.user.user_metadata?.name,
-          });
-        }
+        if (!session) return;
+        // Don't downgrade signupDone here: profiles.name (not user_metadata)
+        // is the source of truth, and fetchProfile() resolves it. Promote
+        // to true if metadata happens to have it; otherwise trust the
+        // persisted value.
+        set((state) => ({
+          authed: true,
+          phone: session.user.phone ?? "",
+          signupDone:
+            state.signupDone || !!session.user.user_metadata?.name,
+        }));
       },
     }),
     {

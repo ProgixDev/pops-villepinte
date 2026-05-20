@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -23,13 +23,18 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const STAGGER_STEP_MS = 30;
 const STAGGER_CAP_MS = 300;
 const ENTRANCE_DURATION_MS = 300;
+// Only the first N rows get a staggered entrance animation. Rows beyond this
+// snap to their final state — rendering them animated would create ~3 timing
+// animations per row on mount, which adds up to noticeable jank on lists with
+// 20+ products.
+const ENTRANCE_ROW_LIMIT = 6;
 
 export type ProductRowProps = {
   product: Product;
   index: number;
 };
 
-export default function ProductRow({
+function ProductRow({
   product,
   index,
 }: ProductRowProps): React.ReactElement {
@@ -37,13 +42,14 @@ export default function ProductRow({
   const reducedMotion = useReducedMotion();
   const addItem = useCartStore((s) => s.addItem);
 
-  const opacity = useSharedValue(reducedMotion ? 1 : 0);
-  const translateY = useSharedValue(reducedMotion ? 0 : 8);
+  const animateEntrance = !reducedMotion && index < ENTRANCE_ROW_LIMIT;
+  const opacity = useSharedValue(animateEntrance ? 0 : 1);
+  const translateY = useSharedValue(animateEntrance ? 8 : 0);
   const pressScale = useSharedValue(1);
   const addPressScale = useSharedValue(1);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (!animateEntrance) return;
     const delay = Math.min(index * STAGGER_STEP_MS, STAGGER_CAP_MS);
     opacity.value = withDelay(delay, withTiming(1, { duration: ENTRANCE_DURATION_MS }));
     translateY.value = withDelay(
@@ -195,3 +201,12 @@ export default function ProductRow({
     </AnimatedPressable>
   );
 }
+
+// Rows past the entrance-animation cap don't depend on `index` for rendering
+// (they snap to final state), so treat any index >= ENTRANCE_ROW_LIMIT change
+// as no-op to avoid re-renders when a parent map's iteration order shifts.
+export default memo(ProductRow, (prev, next) =>
+  prev.product === next.product &&
+  (prev.index === next.index ||
+    (prev.index >= ENTRANCE_ROW_LIMIT && next.index >= ENTRANCE_ROW_LIMIT)),
+);

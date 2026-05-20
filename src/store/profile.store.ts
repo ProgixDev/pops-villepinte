@@ -1,9 +1,10 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { GUEST_NAME } from "@/constants/profile";
+import { GUEST_NAME, isGuestName } from "@/constants/profile";
 import { profileApi, type ProfileData } from "@/lib/api";
 
+import { useAuthStore } from "./auth.store";
 import { asyncStorageAdapter } from "./_storage";
 
 type ProfileState = {
@@ -62,6 +63,12 @@ export const useProfileStore = create<ProfileState>()(
             },
             loading: false,
           });
+          // profiles.name is the truth source for "did the user finish signup?".
+          // Auth store may have signupDone=false (fresh install on a returning
+          // user, missing user_metadata.name, etc.) — fix it here.
+          if (!isGuestName(data.name)) {
+            useAuthStore.setState({ signupDone: true });
+          }
         } catch {
           set({ loading: false });
         }

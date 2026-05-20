@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import FoodPattern from "@/components/common/FoodPattern";
 import { colors } from "@/constants/theme";
+import { useDeferredMount } from "@/hooks/useDeferredMount";
 import { formatFrenchMobile, PHONE_REGEX } from "@/lib/phone";
 import { useAuthStore } from "@/store/auth.store";
 import { useProfileStore } from "@/store/profile.store";
@@ -38,6 +39,8 @@ export default function AuthFlow({
   const loading = useAuthStore((s) => s.loading);
   const authChoice = useAuthStore((s) => s.authChoice);
   const setAuthChoice = useAuthStore((s) => s.setAuthChoice);
+  // Defer the ~250-node food pattern until after first paint.
+  const patternReady = useDeferredMount();
 
   const isRegister = authChoice === "register";
   const phoneTitle = isRegister ? "INSCRIPTION" : "CONNEXION";
@@ -384,12 +387,12 @@ export default function AuthFlow({
         </Pressable>
       </View>
 
-      {/* Food illustrations — dense grid pattern filling bottom 35% */}
+      {/* Food illustrations — dense grid pattern filling bottom 35%, deferred */}
       <View
         pointerEvents="none"
         style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: PATTERN_HEIGHT }}
       >
-        <FoodPattern height={PATTERN_HEIGHT} />
+        {patternReady ? <FoodPattern height={PATTERN_HEIGHT} /> : null}
       </View>
 
       {/* Logo centered at very bottom */}

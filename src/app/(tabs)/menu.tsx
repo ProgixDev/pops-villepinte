@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import FloatingCartBar from "@/components/cart/FloatingCartBar";
 import FoodPattern from "@/components/common/FoodPattern";
+import { SkeletonProductRow } from "@/components/common/Skeleton";
 import Screen from "@/components/layout/Screen";
 import CategoryRail, {
   type CategoryRailSelection,
@@ -15,6 +16,7 @@ import MenuSectionTitle from "@/components/menu/MenuSectionTitle";
 import ProductRow from "@/components/menu/ProductRow";
 import SearchField, { normalizeSearch } from "@/components/menu/SearchField";
 import { colors, font, radius } from "@/constants/theme";
+import { useDeferredMount } from "@/hooks/useDeferredMount";
 import { useMenuStore } from "@/store/menu.store";
 
 export default function MenuScreen(): React.ReactElement {
@@ -22,6 +24,7 @@ export default function MenuScreen(): React.ReactElement {
   const params = useLocalSearchParams<{ cat?: string }>();
   const CATEGORIES = useMenuStore((s) => s.categories);
   const PRODUCTS = useMenuStore((s) => s.products);
+  const menuLoading = useMenuStore((s) => s.loading);
   const fetchMenu = useMenuStore((s) => s.fetchMenu);
   const [selectedId, setSelectedId] = useState<CategoryRailSelection>(
     params.cat ?? "all",
@@ -48,6 +51,11 @@ export default function MenuScreen(): React.ReactElement {
   const onContentLayout = useCallback((e: LayoutChangeEvent) => {
     setContentHeight(e.nativeEvent.layout.height);
   }, []);
+
+  // Defer mounting the decorative food pattern (~250 nodes) until the next
+  // idle window — otherwise it blocks the menu page from appearing on cold
+  // mount.
+  const patternReady = useDeferredMount();
 
   const isSearching = query.trim().length > 0;
   const normalizedQuery = useMemo(
@@ -189,8 +197,16 @@ export default function MenuScreen(): React.ReactElement {
 
       {/* [2] Content with food pattern background */}
       <View style={{ position: "relative" }} onLayout={onContentLayout}>
-        <FoodPattern height={contentHeight} opacity={0.12} />
-      {isSearching ? (
+        {patternReady ? (
+          <FoodPattern height={contentHeight} opacity={0.12} density="sparse" />
+        ) : null}
+      {PRODUCTS.length === 0 && menuLoading ? (
+        <View style={{ paddingTop: 8 }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonProductRow key={`skel-row-${i}`} />
+          ))}
+        </View>
+      ) : isSearching ? (
         <View style={{ paddingTop: 16 }}>
           {filteredProducts.length === 0 ? (
             <View

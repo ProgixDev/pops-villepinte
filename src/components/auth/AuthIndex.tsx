@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import FoodPattern from "@/components/common/FoodPattern";
 import { colors } from "@/constants/theme";
+import { useDeferredMount } from "@/hooks/useDeferredMount";
 import { useAuthStore } from "@/store/auth.store";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -15,6 +16,9 @@ const PATTERN_HEIGHT = Dimensions.get("window").height * 0.35;
 export default function AuthIndex(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const setAuthChoice = useAuthStore((s) => s.setAuthChoice);
+  // Defer the ~250-node food pattern until after first paint so the auth
+  // landing renders instantly instead of blocking on the image grid.
+  const patternReady = useDeferredMount();
 
   const handleChoose = (choice: "signin" | "register"): void => {
     void Haptics.selectionAsync();
@@ -130,12 +134,12 @@ export default function AuthIndex(): React.ReactElement {
         </View>
       </View>
 
-      {/* Food illustrations pattern — bottom 35% */}
+      {/* Food illustrations pattern — bottom 35%, deferred past first paint */}
       <View
         pointerEvents="none"
         style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: PATTERN_HEIGHT }}
       >
-        <FoodPattern height={PATTERN_HEIGHT} />
+        {patternReady ? <FoodPattern height={PATTERN_HEIGHT} /> : null}
       </View>
 
       {/* Bottom safe-area spacer */}
