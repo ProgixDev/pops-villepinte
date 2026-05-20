@@ -35,6 +35,7 @@ import {
   normalizeHours,
 } from "@/lib/shopHours";
 import { useAuthStore } from "@/store/auth.store";
+import { useNotificationsStore } from "@/store/notifications.store";
 import { useProfileStore } from "@/store/profile.store";
 
 export default function ProfileScreen(): React.ReactElement {
@@ -162,23 +163,35 @@ export default function ProfileScreen(): React.ReactElement {
         <View
           style={{
             flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 4,
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
           }}
         >
-          <User size={16} color={colors.primary} strokeWidth={2.5} />
-          <Text
-            style={{
-              fontFamily: font.bodySemi,
-              fontSize: 13,
-              color: colors.primary,
-              letterSpacing: 1,
-              textTransform: "uppercase",
-            }}
-          >
-            Mon profil
-          </Text>
+          <View style={{ flex: 1 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 4,
+              }}
+            >
+              <User size={16} color={colors.primary} strokeWidth={2.5} />
+              <Text
+                style={{
+                  fontFamily: font.bodySemi,
+                  fontSize: 13,
+                  color: colors.primary,
+                  letterSpacing: 1,
+                  textTransform: "uppercase",
+                }}
+              >
+                Mon profil
+              </Text>
+            </View>
+          </View>
+          <NotificationsBell />
         </View>
         <Text
           style={{
@@ -1094,5 +1107,65 @@ function HoursModal({
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+function NotificationsBell(): React.ReactElement {
+  const router = useRouter();
+  const unread = useNotificationsStore((s) => s.unread);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        unread > 0
+          ? `Notifications (${unread} non lue${unread > 1 ? "s" : ""})`
+          : "Notifications"
+      }
+      onPress={() => {
+        void Haptics.selectionAsync();
+        router.push(ROUTES.notifications as never);
+      }}
+      hitSlop={10}
+      style={({ pressed }) => ({
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: "#F5F5F5",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <Bell size={20} color={colors.ink} strokeWidth={2.25} />
+      {unread > 0 ? (
+        <View
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            backgroundColor: colors.accent,
+            paddingHorizontal: 4,
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 2,
+            borderColor: "#F5F5F5",
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: font.bodyBold,
+              fontSize: 9,
+              color: colors.white,
+              lineHeight: 11,
+            }}
+          >
+            {unread > 9 ? "9+" : unread}
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
   );
 }

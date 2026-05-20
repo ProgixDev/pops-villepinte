@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ADMIN } from '../../common/supabase/supabase.module';
-import { loyaltyTier } from '../../common/utils/loyalty';
+import { getLoyaltySettings, loyaltyTierFor } from '../../common/utils/loyalty';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
@@ -19,9 +19,10 @@ export class ProfileService {
 
     if (error || !data) throw new NotFoundException('Profile not found');
 
+    const settings = await getLoyaltySettings(this.supabase);
     return {
       ...data,
-      loyalty_tier: loyaltyTier(data.order_count),
+      loyalty_tier: loyaltyTierFor(data.order_count, settings),
     };
   }
 
@@ -44,9 +45,10 @@ export class ProfileService {
       });
     }
 
+    const settings = await getLoyaltySettings(this.supabase);
     return {
       ...data,
-      loyalty_tier: loyaltyTier(data.order_count),
+      loyalty_tier: loyaltyTierFor(data.order_count, settings),
     };
   }
 }

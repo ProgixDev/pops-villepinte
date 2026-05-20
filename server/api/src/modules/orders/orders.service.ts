@@ -28,13 +28,54 @@ import { OrderStatus, PickupMode } from '../../shared/types';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CustomerOrdersQueryDto, AdminOrdersQueryDto } from './dto/orders-query.dto';
 import { OrdersGateway } from './orders.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @Inject(SUPABASE_ADMIN) private readonly supabase: SupabaseClient,
     private readonly gateway: OrdersGateway,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  // Human-friendly copy for the customer's push + history rows.
+  private statusPushCopy(
+    status: OrderStatus,
+    pickupMode: 'pickup' | 'delivery' | null | undefined,
+  ): { title: string; body: string } | null {
+    const isDelivery = pickupMode === 'delivery';
+    switch (status) {
+      case 'preparing':
+        return {
+          title: 'On allume les plaques 🔥',
+          body: 'Ta commande est en cours de préparation.',
+        };
+      case 'ready':
+        return {
+          title: isDelivery ? 'Prête à partir 🛵' : "C'est prêt !",
+          body: isDelivery
+            ? "Le livreur arrive pour récupérer ton sac."
+            : "Direction le comptoir pour la récupérer.",
+        };
+      case 'handed_to_livreur':
+        return {
+          title: 'Avec le livreur 🛵',
+          body: 'Il est en route — sois dispo à ton adresse.',
+        };
+      case 'picked_up':
+        return {
+          title: 'Bon app\'! 💛',
+          body: isDelivery ? 'Livraison confirmée.' : 'Commande remise.',
+        };
+      case 'cancelled':
+        return {
+          title: 'Commande annulée',
+          body: 'Si tu as une question, contacte-nous.',
+        };
+      default:
+        return null;
+    }
+  }
 
   async createOrder(userId: string, dto: CreateOrderDto) {
     // 0. Resolve pickup vs delivery + fee. We do this up front so any user
@@ -461,6 +502,9 @@ export class OrdersService {
     if (status === 'picked_up') {
       updateData.picked_up_at = new Date().toISOString();
     }
+    if (status === 'cancelled') {
+      updateData.cancelled_at = new Date().toISOString();
+    }
 
     const { data, error } = await this.supabase
       .from('orders')
@@ -474,6 +518,29 @@ export class OrdersService {
     const eventType =
       status === 'cancelled' ? 'order:cancelled' : 'order:status_changed';
     this.gateway.emit({ type: eventType, data });
+
+    // Best-effort push + history row to the customer. We never block the
+    // status update on a delivery hiccup with Expo / device tokens.
+    const copy = this.statusPushCopy(
+      status,
+      data.pickup_mode as 'pickup' | 'delivery' | undefined,
+    );
+    if (copy && data.user_id) {
+      void this.notifications
+        .notify(
+          { kind: 'user', userIds: [data.user_id] },
+          {
+            title: copy.title,
+            body: copy.body,
+            notificationKind: 'order',
+            orderId: data.id,
+            data: { status },
+          },
+        )
+        .catch(() => {
+          /* push is best-effort — failure must not roll back the status update */
+        });
+    }
 
     return data;
   }

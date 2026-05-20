@@ -15,7 +15,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { ArrowRight, Heart } from "lucide-react-native";
+import { ArrowRight, Bell, Heart } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
 
 import FloatingCartBar from "@/components/cart/FloatingCartBar";
 import {
@@ -30,6 +31,7 @@ import { colors, font, radius } from "@/constants/theme";
 import { useDeferredMount } from "@/hooks/useDeferredMount";
 import { formatPriceEUR } from "@/lib/format";
 import { useMenuStore } from "@/store/menu.store";
+import { useNotificationsStore } from "@/store/notifications.store";
 import { useProfileStore } from "@/store/profile.store";
 import type { Product } from "@/types";
 
@@ -365,13 +367,14 @@ export default function AccueilScreen(): React.ReactElement {
 
   return (
     <Screen floatingBottom={<FloatingCartBar />}>
-      {/* ── LOGO ── */}
+      {/* ── LOGO + BELL ── */}
       <View
         style={{
           paddingTop: 8,
           paddingBottom: 8,
           alignItems: "center",
           justifyContent: "center",
+          position: "relative",
         }}
       >
         <Image
@@ -379,6 +382,17 @@ export default function AccueilScreen(): React.ReactElement {
           contentFit="contain"
           style={{ width: 50, height: 50 }}
         />
+        <View
+          style={{
+            position: "absolute",
+            right: 20,
+            top: 8,
+            bottom: 8,
+            justifyContent: "center",
+          }}
+        >
+          <HomeNotificationsBell />
+        </View>
       </View>
 
       {/* ── GREETING ── */}
@@ -748,5 +762,65 @@ export default function AccueilScreen(): React.ReactElement {
       </>
       ) : null}
     </Screen>
+  );
+}
+
+function HomeNotificationsBell(): React.ReactElement {
+  const router = useRouter();
+  const unread = useNotificationsStore((s) => s.unread);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        unread > 0
+          ? `Notifications (${unread} non lue${unread > 1 ? "s" : ""})`
+          : "Notifications"
+      }
+      onPress={() => {
+        void Haptics.selectionAsync();
+        router.push(ROUTES.notifications as never);
+      }}
+      hitSlop={10}
+      style={({ pressed }) => ({
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: "#F5F5F5",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <Bell size={20} color={colors.ink} strokeWidth={2.25} />
+      {unread > 0 ? (
+        <View
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            backgroundColor: colors.accent,
+            paddingHorizontal: 4,
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 2,
+            borderColor: "#F5F5F5",
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: font.bodyBold,
+              fontSize: 9,
+              color: "#fff",
+              lineHeight: 11,
+            }}
+          >
+            {unread > 9 ? "9+" : unread}
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
   );
 }

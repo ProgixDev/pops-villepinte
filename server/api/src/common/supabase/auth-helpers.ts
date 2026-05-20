@@ -66,15 +66,44 @@ async function findAuthUserByPhone(
   admin: SupabaseClient,
   phoneE164: string,
 ): Promise<User | null> {
+  // Supabase strips the leading "+" when storing auth.users.phone, and the
+  // handle_new_user trigger copies that value into profiles.phone — so the
+  // stored form is digits-only ("33612345678"). Match both formats to be safe
+  // against any legacy rows that kept the "+".
+  const phoneNoPlus = phoneE164.startsWith('+')
+    ? phoneE164.slice(1)
+    : phoneE164;
+
   const { data: profile, error: profileErr } = await admin
     .from('profiles')
     .select('id')
-    .eq('phone', phoneE164)
+    .in('phone', [phoneNoPlus, phoneE164])
     .maybeSingle();
   if (profileErr) throw profileErr;
-  if (!profile) return null;
 
-  const { data, error } = await admin.auth.admin.getUserById(profile.id);
+  if (profile) {
+    const { data, error } = await admin.auth.admin.getUserById(profile.id);
+    if (error) throw error;
+    if (data.user) return data.user;
+  }
+
+  // Fallback: an auth user can exist without a profile row if handle_new_user
+  // ever failed. Without this check we'd try to createUser() and Supabase
+  // would 409 with "Phone number already registered by another user".
+  const { data: orphan, error: orphanErr } = await admin
+    .schema('auth')
+    .from('users')
+    .select('id')
+    .eq('phone', phoneNoPlus)
+    .maybeSingle();
+  if (orphanErr) throw orphanErr;
+  if (!orphan) return null;
+
+  await admin
+    .from('profiles')
+    .upsert({ id: orphan.id, phone: phoneNoPlus }, { onConflict: 'id' });
+
+  const { data, error } = await admin.auth.admin.getUserById(orphan.id);
   if (error) throw error;
   return data.user ?? null;
 }

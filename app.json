@@ -4,7 +4,7 @@
     "slug": "pops-villepinte",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/pops-logo.png",
     "scheme": "pops",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -62,6 +62,13 @@
           "ios": {
             "deploymentTarget": "15.1"
           }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/pops-logo.png",
+          "color": "#FFCE00"
         }
       ]
     ],

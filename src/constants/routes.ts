@@ -9,6 +9,7 @@ export const ROUTES = {
   orders: "/orders" as const,
   cart: "/cart" as const,
   checkout: "/checkout" as const,
+  notifications: "/notifications" as const,
 
   menuCategory: (cat: string) =>
     ({ pathname: "/menu" as const, params: { cat } }) as const,

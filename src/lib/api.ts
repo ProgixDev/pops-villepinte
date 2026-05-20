@@ -92,6 +92,46 @@ export const profileApi = {
     api<ProfileData>("/profile", { method: "PATCH", body: data }),
 };
 
+export type NotificationKind = "order" | "broadcast";
+
+export type NotificationData = {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  order_id: string | null;
+  data: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+};
+
+export type LoyaltyConfig = {
+  habitue_min: number;
+  vip_min: number;
+  legende_min: number;
+};
+
+export const loyaltyApi = {
+  get: () => api<LoyaltyConfig>("/loyalty"),
+};
+
+export const notificationsApi = {
+  list: (limit?: number) =>
+    api<NotificationData[]>("/notifications", { params: { limit } }),
+  unreadCount: () => api<number>("/notifications/unread-count"),
+  markRead: (id: string) =>
+    api<NotificationData | null>(`/notifications/${id}/read`, {
+      method: "PATCH",
+    }),
+  markAllRead: () =>
+    api<{ ok: boolean }>("/notifications/read-all", { method: "PATCH" }),
+  registerToken: (token: string, platform: "ios" | "android" | "web") =>
+    api<{ ok: boolean }>("/profile/device-tokens", {
+      method: "POST",
+      body: { token, platform },
+    }),
+};
+
 export const ordersApi = {
   create: (data: CreateOrderPayload) =>
     api<OrderData>("/orders", { method: "POST", body: data }),

@@ -18,6 +18,7 @@ import { SeedModule } from './modules/seed/seed.module';
 import { AuthDevModule } from './modules/auth-dev/auth-dev.module';
 import { AuthPreludeModule } from './modules/auth-prelude/auth-prelude.module';
 import { AccompagnementsModule } from './modules/accompagnements/accompagnements.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AccompagnementsModule } from './modules/accompagnements/accompagnements
     AuthDevModule,
     AuthPreludeModule,
     AccompagnementsModule,
+    NotificationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SupabaseAuthGuard },
