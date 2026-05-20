@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Dimensions, type LayoutChangeEvent, Text, View } from "react-native";
-import { Image } from "expo-image";
+import { type LayoutChangeEvent, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { Search as SearchIcon } from "lucide-react-native";
 import Animated, { LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import FloatingCartBar from "@/components/cart/FloatingCartBar";
+import FoodPattern from "@/components/common/FoodPattern";
 import Screen from "@/components/layout/Screen";
 import CategoryRail, {
   type CategoryRailSelection,
@@ -16,66 +16,6 @@ import ProductRow from "@/components/menu/ProductRow";
 import SearchField, { normalizeSearch } from "@/components/menu/SearchField";
 import { colors, font, radius } from "@/constants/theme";
 import { useMenuStore } from "@/store/menu.store";
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const burgerIll = require("../../../assets/images/burgerillustartion.png") as number;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const friesIll = require("../../../assets/images/friesillustartion.png") as number;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const tacosIll = require("../../../assets/images/tacosillustartion.png") as number;
-
-const { width: SW } = Dimensions.get("window");
-
-const ICONS = [burgerIll, friesIll, tacosIll];
-const ROTATIONS = [-10, 14, -6, 18, -12, 8, -16, 10, -4, 20, -8, 12, -14, 6, -18, 16];
-
-function FoodPatternBg({ height }: { height: number }): React.ReactElement {
-  const rows = Math.ceil(height / 70) + 2;
-  const cols = Math.ceil(SW / 55);
-  const items: React.ReactElement[] = [];
-  let idx = 0;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const src = ICONS[idx % ICONS.length]!;
-      const rot = ROTATIONS[idx % ROTATIONS.length]!;
-      items.push(
-        <View
-          key={`${r}-${c}`}
-          style={{
-            position: "absolute",
-            width: 40,
-            height: 40,
-            top: r * 70 + (c % 2 === 0 ? 0 : 35),
-            left: c * 55 + (r % 2 === 0 ? 0 : 26),
-            transform: [{ rotate: `${rot}deg` }],
-            opacity: 0.12,
-          }}
-        >
-          <Image
-            source={src}
-            contentFit="contain"
-            style={{ width: 40, height: 40 }}
-          />
-        </View>,
-      );
-      idx++;
-    }
-  }
-  return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        height,
-      }}
-    >
-      {items}
-    </View>
-  );
-}
 
 export default function MenuScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
@@ -249,7 +189,7 @@ export default function MenuScreen(): React.ReactElement {
 
       {/* [2] Content with food pattern background */}
       <View style={{ position: "relative" }} onLayout={onContentLayout}>
-        <FoodPatternBg height={contentHeight} />
+        <FoodPattern height={contentHeight} opacity={0.12} />
       {isSearching ? (
         <View style={{ paddingTop: 16 }}>
           {filteredProducts.length === 0 ? (

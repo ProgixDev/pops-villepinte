@@ -3,60 +3,14 @@ import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import FoodPattern from "@/components/common/FoodPattern";
 import { colors } from "@/constants/theme";
 import { useAuthStore } from "@/store/auth.store";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const logoImage = require("../../../assets/images/pops-logo.png") as number;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const burgerIll = require("../../../assets/images/burgerillustartion.png") as number;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const friesIll = require("../../../assets/images/friesillustartion.png") as number;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const tacosIll = require("../../../assets/images/tacosillustartion.png") as number;
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const SCREEN_HEIGHT = Dimensions.get("window").height;
-const ICONS = [burgerIll, friesIll, tacosIll];
-const ROTATIONS = [-10, 14, -6, 18, -12, 8, -16, 10, -4, 20, -8, 12, -14, 6, -18, 16];
-
-function buildPatternItems(): React.ReactElement[] {
-  const patternHeight = SCREEN_HEIGHT * 0.35;
-  const rows = Math.ceil(patternHeight / 70) + 2;
-  const cols = Math.ceil(SCREEN_WIDTH / 55);
-  const items: React.ReactElement[] = [];
-  let idx = 0;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const src = ICONS[idx % ICONS.length]!;
-      const rot = ROTATIONS[idx % ROTATIONS.length]!;
-      items.push(
-        <View
-          key={`${r}-${c}`}
-          style={{
-            position: "absolute",
-            width: 40,
-            height: 40,
-            top: r * 70 + (c % 2 === 0 ? 0 : 35),
-            left: c * 55 + (r % 2 === 0 ? 0 : 26),
-            transform: [{ rotate: `${rot}deg` }],
-            opacity: 0.6,
-          }}
-        >
-          <Image
-            source={src}
-            contentFit="contain"
-            style={{ width: 40, height: 40 }}
-          />
-        </View>,
-      );
-      idx++;
-    }
-  }
-  return items;
-}
-
-const patternItems = buildPatternItems();
+const PATTERN_HEIGHT = Dimensions.get("window").height * 0.35;
 
 export default function AuthIndex(): React.ReactElement {
   const insets = useSafeAreaInsets();
@@ -179,9 +133,9 @@ export default function AuthIndex(): React.ReactElement {
       {/* Food illustrations pattern — bottom 35% */}
       <View
         pointerEvents="none"
-        style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "35%" }}
+        style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: PATTERN_HEIGHT }}
       >
-        {patternItems}
+        <FoodPattern height={PATTERN_HEIGHT} />
       </View>
 
       {/* Bottom safe-area spacer */}

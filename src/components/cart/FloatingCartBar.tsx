@@ -12,6 +12,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useEffect } from "react";
 
+import { ROUTES } from "@/constants/routes";
 import { formatPriceEUR } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
 
@@ -63,7 +64,7 @@ export default function FloatingCartBar(): React.ReactElement | null {
       <AnimatedPressable
         accessibilityRole="button"
         accessibilityLabel={`Voir le panier — ${itemLabel}, ${formatPriceEUR(total)}`}
-        onPress={() => router.push("/cart")}
+        onPress={() => router.push(ROUTES.cart)}
         onPressIn={() => {
           pressScale.value = withTiming(0.97, { duration: 120 });
         }}

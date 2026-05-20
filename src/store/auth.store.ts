@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import { normalizeFrenchMobile } from "@/lib/phone";
 import { supabase } from "@/lib/supabase";
 
 import { asyncStorageAdapter } from "./_storage";
@@ -35,13 +36,6 @@ type SessionPayload = {
 };
 
 type ApiEnvelope<T> = { data?: T; error?: { message?: string } };
-
-function normalize(rawPhone: string): string {
-  const cleaned = rawPhone.replace(/\s/g, "");
-  return cleaned.startsWith("+33")
-    ? cleaned
-    : `+33${cleaned.replace(/^0/, "")}`;
-}
 
 async function postApi<T>(
   path: string,
@@ -83,7 +77,11 @@ export const useAuthStore = create<AuthState>()(
 
       sendOtp: async (rawPhone: string) => {
         set({ loading: true });
-        const phone = normalize(rawPhone);
+        const phone = normalizeFrenchMobile(rawPhone);
+        if (!phone) {
+          set({ loading: false });
+          return { error: "Numéro invalide." };
+        }
 
         // Dev bypass: skip Prelude entirely, accept the constant code on verify.
         if (DEV_AUTH) {
@@ -98,7 +96,11 @@ export const useAuthStore = create<AuthState>()(
 
       verifyOtp: async (rawPhone: string, code: string) => {
         set({ loading: true });
-        const phone = normalize(rawPhone);
+        const phone = normalizeFrenchMobile(rawPhone);
+        if (!phone) {
+          set({ loading: false });
+          return { error: "Numéro invalide." };
+        }
 
         const endpoint = DEV_AUTH ? "/auth/dev-signin" : "/auth/verify-code";
         if (DEV_AUTH && code !== DEV_OTP_CODE) {

@@ -12,6 +12,7 @@ import CartEmpty from "@/components/cart/CartEmpty";
 import CartItemRow from "@/components/cart/CartItemRow";
 import CartSuggestionCard from "@/components/cart/CartSuggestionCard";
 import CartTotals from "@/components/cart/CartTotals";
+import { ROUTES } from "@/constants/routes";
 import { colors } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
@@ -48,7 +49,7 @@ export default function CartScreen(): React.ReactElement {
 
   const handleValidate = (): void => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.push("/checkout");
+    router.push(ROUTES.checkout);
   };
 
   if (items.length === 0) {

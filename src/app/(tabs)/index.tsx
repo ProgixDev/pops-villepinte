@@ -20,6 +20,8 @@ import { ArrowRight, Heart } from "lucide-react-native";
 import FloatingCartBar from "@/components/cart/FloatingCartBar";
 import Screen from "@/components/layout/Screen";
 import CategoryChip from "@/components/menu/CategoryChip";
+import { displayNameOrFallback } from "@/constants/profile";
+import { ROUTES } from "@/constants/routes";
 import { colors, font, radius } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import { useMenuStore } from "@/store/menu.store";
@@ -280,12 +282,7 @@ function SignatureCarousel({
             <SignatureSlide
               key={p.id}
               product={p}
-              onPress={() =>
-                router.push({
-                  pathname: "/product/[id]",
-                  params: { id: p.id },
-                })
-              }
+              onPress={() => router.push(ROUTES.productDetail(p.id))}
             />
           ))}
         </Animated.View>
@@ -349,7 +346,7 @@ export default function AccueilScreen(): React.ReactElement {
     [PRODUCTS],
   );
 
-  const greetingName = name === "Invité" ? "toi" : name;
+  const greetingName = displayNameOrFallback(name);
 
   return (
     <Screen floatingBottom={<FloatingCartBar />}>
@@ -440,9 +437,7 @@ export default function AccueilScreen(): React.ReactElement {
             <CategoryChip
               key={cat.id}
               category={cat}
-              onPress={() =>
-                router.push({ pathname: "/menu", params: { cat: cat.id } })
-              }
+              onPress={() => router.push(ROUTES.menuCategory(cat.id))}
             />
           ))}
         </ScrollView>
@@ -484,7 +479,7 @@ export default function AccueilScreen(): React.ReactElement {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Voir tout le menu"
-            onPress={() => router.push("/menu")}
+            onPress={() => router.push(ROUTES.menu)}
             style={{
               borderRadius: radius.pill,
               borderWidth: 1.5,
@@ -513,9 +508,7 @@ export default function AccueilScreen(): React.ReactElement {
             <Pressable
               key={p.id}
               accessibilityRole="button"
-              onPress={() =>
-                router.push({ pathname: "/product/[id]", params: { id: p.id } })
-              }
+              onPress={() => router.push(ROUTES.productDetail(p.id))}
               style={{
                 width: CARD_WIDTH,
                 overflow: "hidden",

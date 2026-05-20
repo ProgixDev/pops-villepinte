@@ -9,6 +9,7 @@ import Screen from "@/components/layout/Screen";
 import ActiveOrderCard from "@/components/orders/ActiveOrderCard";
 import OrdersEmpty from "@/components/orders/OrdersEmpty";
 import PastOrderRow from "@/components/orders/PastOrderRow";
+import { ROUTES } from "@/constants/routes";
 import { colors, font, radius, shadow } from "@/constants/theme";
 import { useCartStore } from "@/store/cart.store";
 import { useOrdersStore } from "@/store/orders.store";
@@ -39,7 +40,7 @@ export default function OrdersScreen(): React.ReactElement {
           notes: item.notes,
         });
       }
-      router.push("/cart");
+      router.push(ROUTES.cart);
     },
     [addItem, router],
   );

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ANON } from '../../common/supabase/supabase.module';
+import { PRODUCT_SELECT_WITH_RELATIONS } from '../../shared/queries';
 import { MenuProductsQueryDto } from './dto/menu-query.dto';
 
 @Injectable()
@@ -23,9 +24,7 @@ export class MenuService {
   async getProducts(query: MenuProductsQueryDto) {
     let qb = this.supabase
       .from('products')
-      .select(
-        '*, image_url:image_path, product_variants(*), product_supplements(supplement_id, supplements(*))',
-      )
+      .select(PRODUCT_SELECT_WITH_RELATIONS)
       .eq('is_available', true);
 
     if (query.category_id) {
@@ -46,9 +45,7 @@ export class MenuService {
   async getProductById(id: string) {
     const { data, error } = await this.supabase
       .from('products')
-      .select(
-        '*, image_url:image_path, product_variants(*), product_supplements(supplement_id, supplements(*))',
-      )
+      .select(PRODUCT_SELECT_WITH_RELATIONS)
       .eq('id', id)
       .single();
 
@@ -98,9 +95,7 @@ export class MenuService {
     const ids = rows.map((r) => r.product_id);
     const { data: products, error: productsError } = await this.supabase
       .from('products')
-      .select(
-        '*, image_url:image_path, product_variants(*), product_supplements(supplement_id, supplements(*))',
-      )
+      .select(PRODUCT_SELECT_WITH_RELATIONS)
       .in('id', ids)
       .eq('is_available', true);
 

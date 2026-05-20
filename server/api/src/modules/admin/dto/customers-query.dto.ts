@@ -1,4 +1,5 @@
 import { IsIn, IsOptional, IsString } from 'class-validator';
+import type { LoyaltyTier } from '../../../common/utils/loyalty';
 import { PaginationDto } from '../../../shared/dto/pagination.dto';
 
 export class CustomersQueryDto extends PaginationDto {
@@ -9,5 +10,5 @@ export class CustomersQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
   @IsIn(['BIENVENUE', 'HABITUE', 'VIP', 'LEGENDE'])
-  tier?: string;
+  tier?: LoyaltyTier;
 }

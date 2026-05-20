@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ADMIN } from '../../common/supabase/supabase.module';
+import { PRODUCT_SELECT_WITH_RELATIONS } from '../../shared/queries';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto, ToggleAvailabilityDto } from './dto/update-product.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -38,9 +39,7 @@ export class AdminCatalogueService {
   async listProducts() {
     const { data, error } = await this.supabase
       .from('products')
-      .select(
-        '*, image_url:image_path, product_variants(*), product_supplements(supplement_id, supplements(*))',
-      )
+      .select(PRODUCT_SELECT_WITH_RELATIONS)
       .order('name', { ascending: true });
     if (error) throw error;
     return data ?? [];
@@ -49,9 +48,7 @@ export class AdminCatalogueService {
   async getProduct(id: string) {
     const { data, error } = await this.supabase
       .from('products')
-      .select(
-        '*, image_url:image_path, product_variants(*), product_supplements(supplement_id, supplements(*))',
-      )
+      .select(PRODUCT_SELECT_WITH_RELATIONS)
       .eq('id', id)
       .single();
     if (error) throw new NotFoundException('Product not found');
@@ -262,7 +259,7 @@ export class AdminCatalogueService {
     const { data, error } = await this.supabase
       .from('home_signatures')
       .select(
-        'position, products(*, image_url:image_path, product_variants(*), product_supplements(supplement_id, supplements(*)))',
+        `position, products(${PRODUCT_SELECT_WITH_RELATIONS})`,
       )
       .order('position', { ascending: true });
 
@@ -318,7 +315,7 @@ export class AdminCatalogueService {
     const { data, error } = await this.supabase
       .from('home_advice')
       .select(
-        'position, products(*, image_url:image_path, product_variants(*), product_supplements(supplement_id, supplements(*)))',
+        `position, products(${PRODUCT_SELECT_WITH_RELATIONS})`,
       )
       .order('position', { ascending: true });
 

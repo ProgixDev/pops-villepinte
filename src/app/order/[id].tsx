@@ -17,6 +17,11 @@ import OrderStatusPill from "@/components/order/OrderStatusPill";
 import OrderTimeline from "@/components/order/OrderTimeline";
 import PickupInstructions from "@/components/order/PickupInstructions";
 import SuccessOverlay from "@/components/order/SuccessOverlay";
+import {
+  isTerminalOrderStatus,
+  ORDER_STATUS,
+} from "@/constants/orderStatus";
+import { ROUTES } from "@/constants/routes";
 import { colors } from "@/constants/theme";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useOrdersStore } from "@/store/orders.store";
@@ -52,7 +57,7 @@ export default function OrderDetailScreen(): React.ReactElement {
 
   // Poll for status updates from the server
   useEffect(() => {
-    if (!order || order.status === "cancelled" || order.status === "picked_up") return;
+    if (!order || isTerminalOrderStatus(order.status)) return;
 
     // Initial fetch
     void fetchOrderById(id);
@@ -79,7 +84,7 @@ export default function OrderDetailScreen(): React.ReactElement {
   const handleSuccessFinish = useCallback(() => {
     if (!order) return;
     setShowSuccess(false);
-    router.replace("/orders");
+    router.replace(ROUTES.orders);
   }, [order, router]);
 
   if (!order) {
@@ -112,9 +117,9 @@ export default function OrderDetailScreen(): React.ReactElement {
     );
   }
 
-  const isPreparing = order.status === "preparing";
-  const isReady = order.status === "ready";
-  const isTerminal = order.status === "picked_up" || order.status === "cancelled";
+  const isPreparing = order.status === ORDER_STATUS.PREPARING;
+  const isReady = order.status === ORDER_STATUS.READY;
+  const isTerminal = isTerminalOrderStatus(order.status);
 
   const showCtaPreparing = isPreparing;
   const showCtaReady = isReady;

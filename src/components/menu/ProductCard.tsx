@@ -9,6 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 
+import { ROUTES } from "@/constants/routes";
 import { colors, shadow } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
@@ -67,10 +68,7 @@ export default function ProductCard({
   const sizing = SIZING[size];
 
   const handlePress = (): void => {
-    router.push({
-      pathname: "/product/[id]",
-      params: { id: product.id },
-    });
+    router.push(ROUTES.productDetail(product.id));
   };
 
   const handleAdd = (): void => {

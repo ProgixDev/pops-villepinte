@@ -1,15 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ADMIN } from '../../common/supabase/supabase.module';
-import { loyaltyTier, LoyaltyTier } from '../../common/utils/loyalty';
+import { loyaltyTier, tierRange } from '../../common/utils/loyalty';
 import { CustomersQueryDto } from './dto/customers-query.dto';
-
-const TIER_RANGES: Record<string, { min: number; max: number }> = {
-  BIENVENUE: { min: 0, max: 4 },
-  HABITUE: { min: 5, max: 19 },
-  VIP: { min: 20, max: 49 },
-  LEGENDE: { min: 50, max: 999999 },
-};
 
 @Injectable()
 export class AdminCustomersService {
@@ -27,10 +20,8 @@ export class AdminCustomersService {
     }
 
     if (query.tier) {
-      const range = TIER_RANGES[query.tier];
-      if (range) {
-        qb = qb.gte('order_count', range.min).lte('order_count', range.max);
-      }
+      const range = tierRange(query.tier);
+      qb = qb.gte('order_count', range.min).lte('order_count', range.max);
     }
 
     qb = qb

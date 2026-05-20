@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import { GUEST_NAME } from "@/constants/profile";
 import { profileApi, type ProfileData } from "@/lib/api";
 
 import { asyncStorageAdapter } from "./_storage";
@@ -24,7 +25,7 @@ export const useProfileStore = create<ProfileState>()(
   persist(
     (set, get) => ({
       profile: {
-        name: "Invité",
+        name: GUEST_NAME,
         phone: "",
         orderCount: 0,
         loyaltyTier: "BIENVENUE",
@@ -54,7 +55,7 @@ export const useProfileStore = create<ProfileState>()(
           const data: ProfileData = await profileApi.get();
           set({
             profile: {
-              name: data.name || "Invité",
+              name: data.name || GUEST_NAME,
               phone: data.phone || "",
               orderCount: data.order_count,
               loyaltyTier: data.loyalty_tier,

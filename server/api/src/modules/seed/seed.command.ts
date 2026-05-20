@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Command, CommandRunner } from 'nest-commander';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ADMIN } from '../../common/supabase/supabase.module';
+import type { Env } from '../../config/env.validation';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-const IMAGES_BUCKET = 'product-images';
 // repo-root/assets/products from this file: 5 levels up
 const IMAGES_DIR = path.resolve(__dirname, '../../../../../assets/products');
 
@@ -220,16 +221,20 @@ const PRODUCTS: ProductSeed[] = [
 @Command({ name: 'seed:menu', description: 'Seed menu data into Supabase' })
 @Injectable()
 export class SeedCommand extends CommandRunner {
+  private readonly bucket: string;
+
   constructor(
     @Inject(SUPABASE_ADMIN) private readonly supabase: SupabaseClient,
+    cfg: ConfigService<Env, true>,
   ) {
     super();
+    this.bucket = cfg.get('PRODUCT_IMAGES_BUCKET', { infer: true });
   }
 
   private async ensureBucket(): Promise<void> {
-    const { data: existing } = await this.supabase.storage.getBucket(IMAGES_BUCKET);
+    const { data: existing } = await this.supabase.storage.getBucket(this.bucket);
     if (existing) return;
-    const { error } = await this.supabase.storage.createBucket(IMAGES_BUCKET, {
+    const { error } = await this.supabase.storage.createBucket(this.bucket, {
       public: true,
     });
     if (error && !/already exists/i.test(error.message)) {
@@ -245,17 +250,17 @@ export class SeedCommand extends CommandRunner {
       const full = path.join(IMAGES_DIR, file);
       const buf = await fs.readFile(full);
       const { error: upErr } = await this.supabase.storage
-        .from(IMAGES_BUCKET)
+        .from(this.bucket)
         .upload(file, buf, { upsert: true, contentType: 'image/png' });
       if (upErr) {
         throw new Error(`Upload ${file} failed: ${upErr.message}`);
       }
       const { data } = this.supabase.storage
-        .from(IMAGES_BUCKET)
+        .from(this.bucket)
         .getPublicUrl(file);
       urls.set(file, data.publicUrl);
     }
-    console.log(`✅ ${urls.size} product images uploaded to "${IMAGES_BUCKET}"`);
+    console.log(`✅ ${urls.size} product images uploaded to "${this.bucket}"`);
     return urls;
   }
 

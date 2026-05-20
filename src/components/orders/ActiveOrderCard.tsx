@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ChevronRight, Clock } from "lucide-react-native";
 
+import { ROUTES } from "@/constants/routes";
 import { colors, font, radius, shadow } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import { useCountdown } from "@/hooks/useCountdown";
@@ -27,9 +28,7 @@ export default function ActiveOrderCard({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Voir la commande ${order.id}`}
-      onPress={() =>
-        router.push({ pathname: "/order/[id]", params: { id: order.id } })
-      }
+      onPress={() => router.push(ROUTES.orderDetail(order.id))}
       style={{
         marginHorizontal: 20,
         backgroundColor: colors.primary,

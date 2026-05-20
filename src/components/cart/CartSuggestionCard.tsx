@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { ROUTES } from "@/constants/routes";
 import { colors } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
@@ -39,12 +40,12 @@ export default function CartSuggestionCard({
   const hasVariants = product.product_variants !== undefined && product.product_variants.length > 0;
 
   const handleCardPress = (): void => {
-    router.push({ pathname: "/product/[id]", params: { id: product.id } });
+    router.push(ROUTES.productDetail(product.id));
   };
 
   const handleAdd = (): void => {
     if (hasVariants) {
-      router.push({ pathname: "/product/[id]", params: { id: product.id } });
+      router.push(ROUTES.productDetail(product.id));
       return;
     }
     void Haptics.selectionAsync();

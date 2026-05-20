@@ -2,6 +2,10 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import {
+  isActiveOrderStatus,
+  isTerminalOrderStatus,
+} from "@/constants/orderStatus";
+import {
   ordersApi,
   type CreateOrderPayload,
   type OrderData,
@@ -102,11 +106,7 @@ export const useOrdersStore = create<OrdersState>()(
         try {
           const data = await ordersApi.get(id);
           const order = toOrder(data);
-          if (
-            order.status === "received" ||
-            order.status === "preparing" ||
-            order.status === "ready"
-          ) {
+          if (isActiveOrderStatus(order.status)) {
             set({ active: order });
           }
           return order;
@@ -136,7 +136,7 @@ export const useOrdersStore = create<OrdersState>()(
         try {
           const data = await ordersApi.get(active.id);
           const order = toOrder(data);
-          if (order.status === "picked_up" || order.status === "cancelled") {
+          if (isTerminalOrderStatus(order.status)) {
             set((state) => ({
               active: null,
               history: [order, ...state.history],

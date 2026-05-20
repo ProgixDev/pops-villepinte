@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { ROUTES } from "@/constants/routes";
 import { colors } from "@/constants/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -22,7 +23,7 @@ export default function CartEmpty(): React.ReactElement {
   const handleExplore = (): void => {
     router.back();
     setTimeout(() => {
-      router.replace("/menu");
+      router.replace(ROUTES.menu);
     }, 0);
   };
 

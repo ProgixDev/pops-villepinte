@@ -14,19 +14,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import OrderConfirmation from "@/components/order/OrderConfirmation";
 import TextField from "@/components/form/TextField";
+import { isGuestName } from "@/constants/profile";
+import { ROUTES } from "@/constants/routes";
 import { colors, font, radius } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
+import { formatFrenchMobile, PHONE_REGEX } from "@/lib/phone";
 import { getLineUnitPrice, useCartStore } from "@/store/cart.store";
 import { useMenuStore } from "@/store/menu.store";
 import { useOrdersStore } from "@/store/orders.store";
 import { useProfileStore } from "@/store/profile.store";
-
-const PHONE_REGEX = /^0[67](\d{2}){4}$/;
-
-function formatFrenchMobile(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 10);
-  return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
-}
 
 export default function CheckoutScreen(): React.ReactElement {
   const router = useRouter();
@@ -42,7 +38,7 @@ export default function CheckoutScreen(): React.ReactElement {
   const getSupplementById = useMenuStore((s) => s.getSupplementById);
 
   const [name, setName] = useState<string>(
-    profile.name === "Invité" ? "" : profile.name,
+    isGuestName(profile.name) ? "" : profile.name,
   );
   const [phone, setPhone] = useState<string>(
     profile.phone ? formatFrenchMobile(profile.phone) : "",
@@ -57,7 +53,7 @@ export default function CheckoutScreen(): React.ReactElement {
 
   useEffect(() => {
     if (items.length === 0 && !showConfirmation) {
-      router.replace("/");
+      router.replace(ROUTES.home);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
@@ -140,10 +136,7 @@ export default function CheckoutScreen(): React.ReactElement {
   const handleConfirmationDone = (): void => {
     setShowConfirmation(false);
     if (pendingOrderId !== null) {
-      router.replace({
-        pathname: "/order/[id]",
-        params: { id: pendingOrderId },
-      });
+      router.replace(ROUTES.orderDetail(pendingOrderId));
     }
   };
 

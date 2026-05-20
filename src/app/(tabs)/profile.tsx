@@ -19,17 +19,14 @@ import Screen from "@/components/layout/Screen";
 import TextField from "@/components/form/TextField";
 import StatsCard from "@/components/profile/StatsCard";
 import SettingsRow from "@/components/profile/SettingsRow";
+import { GUEST_NAME, isGuestName } from "@/constants/profile";
+import { ROUTES } from "@/constants/routes";
 import { colors, font, radius, shadow } from "@/constants/theme";
 import { menuApi, type ShopSettings } from "@/lib/api";
+import { loyaltyMessage, loyaltyTier } from "@/lib/loyalty";
+import { formatFrenchMobile, PHONE_REGEX } from "@/lib/phone";
 import { useAuthStore } from "@/store/auth.store";
 import { useProfileStore } from "@/store/profile.store";
-
-const PHONE_REGEX = /^0[67](\d{2}){4}$/;
-
-function formatFrenchMobile(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 10);
-  return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
-}
 
 export default function ProfileScreen(): React.ReactElement {
   const profile = useProfileStore((s) => s.profile);
@@ -37,7 +34,7 @@ export default function ProfileScreen(): React.ReactElement {
   const setProfilePhone = useProfileStore((s) => s.setPhone);
 
   const [name, setName] = useState<string>(
-    profile.name === "Invité" ? "" : profile.name,
+    isGuestName(profile.name) ? "" : profile.name,
   );
   const [phone, setPhone] = useState<string>(
     profile.phone
@@ -64,8 +61,9 @@ export default function ProfileScreen(): React.ReactElement {
     };
   }, []);
 
-  const displayName =
-    profile.name === "Invité" ? "SALUT !" : profile.name.toUpperCase();
+  const displayName = isGuestName(profile.name)
+    ? "SALUT !"
+    : profile.name.toUpperCase();
 
   const handlePhoneChange = (v: string): void => {
     const formatted = formatFrenchMobile(v);
@@ -228,13 +226,7 @@ export default function ProfileScreen(): React.ReactElement {
                   letterSpacing: 1,
                 }}
               >
-                {profile.orderCount === 0
-                  ? "BIENVENUE"
-                  : profile.orderCount <= 5
-                    ? "HABITUE"
-                    : profile.orderCount <= 15
-                      ? "VIP"
-                      : "LEGENDE"}
+                {loyaltyTier(profile.orderCount)}
               </Text>
             </View>
           </View>
@@ -256,13 +248,10 @@ export default function ProfileScreen(): React.ReactElement {
               opacity: 0.7,
             }}
           >
-            {profile.orderCount === 0
-              ? "Premier passage ? Bienvenue dans la famille Pop's."
-              : profile.orderCount <= 5
-                ? `Bienvenue chez nous, ${profile.name === "Invité" ? "toi" : profile.name}. On te reconnait deja.`
-                : profile.orderCount <= 15
-                  ? "Tu fais partie des habitues. On garde ta place au chaud."
-                  : `Legende vivante. Respect, ${profile.name === "Invité" ? "toi" : profile.name}.`}
+            {loyaltyMessage(
+              profile.orderCount,
+              isGuestName(profile.name) ? "toi" : profile.name,
+            )}
           </Text>
         </View>
       </View>
@@ -409,7 +398,7 @@ export default function ProfileScreen(): React.ReactElement {
         </View>
 
         <View style={{ paddingHorizontal: 20 }}>
-          <SettingsRow icon={Heart} label="Favoris" onPress={() => router.push("/settings/favoris")} />
+          <SettingsRow icon={Heart} label="Favoris" onPress={() => router.push(ROUTES.settings("favoris"))} />
           <View
             style={{
               height: 1,
@@ -417,7 +406,7 @@ export default function ProfileScreen(): React.ReactElement {
               marginLeft: 56,
             }}
           />
-          <SettingsRow icon={Award} label="Fidelite" onPress={() => router.push("/settings/fidelite")} />
+          <SettingsRow icon={Award} label="Fidelite" onPress={() => router.push(ROUTES.settings("fidelite"))} />
           <View
             style={{
               height: 1,
@@ -425,7 +414,7 @@ export default function ProfileScreen(): React.ReactElement {
               marginLeft: 56,
             }}
           />
-          <SettingsRow icon={Bell} label="Notifications" onPress={() => router.push("/settings/notifications")} />
+          <SettingsRow icon={Bell} label="Notifications" onPress={() => router.push(ROUTES.settings("notifications"))} />
           <View
             style={{
               height: 1,
@@ -433,7 +422,7 @@ export default function ProfileScreen(): React.ReactElement {
               marginLeft: 56,
             }}
           />
-          <SettingsRow icon={FileText} label="Conditions generales" onPress={() => router.push("/settings/conditions")} />
+          <SettingsRow icon={FileText} label="Conditions generales" onPress={() => router.push(ROUTES.settings("conditions"))} />
           <View
             style={{
               height: 1,
@@ -441,7 +430,7 @@ export default function ProfileScreen(): React.ReactElement {
               marginLeft: 56,
             }}
           />
-          <SettingsRow icon={MessageCircle} label="Nous contacter" onPress={() => router.push("/settings/contact")} />
+          <SettingsRow icon={MessageCircle} label="Nous contacter" onPress={() => router.push(ROUTES.settings("contact"))} />
           <View
             style={{
               height: 1,
