@@ -1,12 +1,35 @@
-import { OrderStatus } from './types';
+import { OrderStatus, PickupMode } from './types';
 
-export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+// Transitions branch on pickup_mode so the kanban (admin) and customer screens
+// reflect the right lifecycle:
+//   pickup    : received → preparing → ready → picked_up
+//   delivery  : received → preparing → ready → handed_to_livreur → picked_up
+export const ORDER_STATUS_TRANSITIONS_PICKUP: Record<OrderStatus, OrderStatus[]> = {
   received: ['preparing', 'cancelled'],
   preparing: ['ready', 'cancelled'],
   ready: ['picked_up'],
+  handed_to_livreur: [],
   picked_up: [],
   cancelled: [],
 };
+
+export const ORDER_STATUS_TRANSITIONS_DELIVERY: Record<
+  OrderStatus,
+  OrderStatus[]
+> = {
+  received: ['preparing', 'cancelled'],
+  preparing: ['ready', 'cancelled'],
+  ready: ['handed_to_livreur', 'cancelled'],
+  handed_to_livreur: ['picked_up'],
+  picked_up: [],
+  cancelled: [],
+};
+
+export function transitionsFor(mode: PickupMode | null | undefined) {
+  return mode === 'delivery'
+    ? ORDER_STATUS_TRANSITIONS_DELIVERY
+    : ORDER_STATUS_TRANSITIONS_PICKUP;
+}
 
 export const CUSTOMER_CANCELLABLE_STATUSES: OrderStatus[] = ['received'];
 export const ADMIN_CANCELLABLE_STATUSES: OrderStatus[] = [

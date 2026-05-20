@@ -24,12 +24,14 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   received: "Reçue",
   preparing: "On prépare…",
   ready: "C'est prêt !",
+  handed_to_livreur: "Le livreur arrive",
   picked_up: "Récupérée",
   cancelled: "Annulée",
 };
 
 function ringColor(s: OrderStatus): string {
   if (s === "ready" || s === "picked_up") return colors.success;
+  if (s === "handed_to_livreur") return colors.primaryDark;
   if (s === "cancelled") return colors.error;
   return colors.primary;
 }

@@ -1,30 +1,39 @@
-import { useEffect, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import {
   Award,
   Bell,
-  Calendar,
   CheckCircle,
+  ChevronRight,
   Clock,
   FileText,
   Heart,
   LogOut,
   MessageCircle,
   User,
+  X,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 
 import Screen from "@/components/layout/Screen";
 import TextField from "@/components/form/TextField";
-import StatsCard from "@/components/profile/StatsCard";
 import SettingsRow from "@/components/profile/SettingsRow";
-import { GUEST_NAME, isGuestName } from "@/constants/profile";
+import { isGuestName } from "@/constants/profile";
 import { ROUTES } from "@/constants/routes";
 import { colors, font, radius, shadow } from "@/constants/theme";
-import { menuApi, type ShopSettings } from "@/lib/api";
+import { menuApi, type ShopSettings, type DayKey } from "@/lib/api";
 import { loyaltyMessage, loyaltyTier } from "@/lib/loyalty";
 import { formatFrenchMobile, PHONE_REGEX } from "@/lib/phone";
+import {
+  DAY_KEYS,
+  DAY_LABELS_LONG,
+  DAY_LABELS_SHORT,
+  computeOpenState,
+  dayKeyFromDate,
+  formatDayRange,
+  normalizeHours,
+} from "@/lib/shopHours";
 import { useAuthStore } from "@/store/auth.store";
 import { useProfileStore } from "@/store/profile.store";
 
@@ -45,6 +54,9 @@ export default function ProfileScreen(): React.ReactElement {
   const [phoneError, setPhoneError] = useState<string | undefined>();
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [hoursOpen, setHoursOpen] = useState(false);
+  // Re-render every 60s so the open/closed pill stays accurate.
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +72,20 @@ export default function ProfileScreen(): React.ReactElement {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const hoursByDay = useMemo(
+    () => normalizeHours(shopSettings?.hours_by_day),
+    [shopSettings?.hours_by_day],
+  );
+  const openState = useMemo(
+    () => computeOpenState(hoursByDay),
+    [hoursByDay],
+  );
 
   const displayName = isGuestName(profile.name)
     ? "SALUT !"
@@ -315,22 +341,66 @@ export default function ProfileScreen(): React.ReactElement {
         </View>
 
         {shopSettings ? (
-          <>
-            <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
-              <ReadOnlyInfoRow
-                icon={Calendar}
-                label="Jours d'ouverture"
-                value={shopSettings.open_days}
-              />
-            </View>
-            <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
-              <ReadOnlyInfoRow
-                icon={Clock}
-                label="Temps d'ouverture"
-                value={shopSettings.open_hours}
-              />
-            </View>
-          </>
+          <View style={{ paddingHorizontal: 20, marginTop: 20, gap: 12 }}>
+            <ShopStatusPill state={openState} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Voir les horaires d'ouverture"
+              onPress={() => {
+                void Haptics.selectionAsync();
+                setHoursOpen(true);
+              }}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 14,
+                backgroundColor: "#F7F7F4",
+                borderRadius: radius.lg,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  backgroundColor: colors.white,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Clock size={18} color={colors.ink} strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontFamily: font.bodySemi,
+                    fontSize: 10,
+                    letterSpacing: 1.5,
+                    color: colors.inkMuted,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Horaires d'ouverture
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontFamily: font.bodyBold,
+                    fontSize: 14,
+                    color: colors.ink,
+                    marginTop: 2,
+                  }}
+                >
+                  {DAY_LABELS_LONG[openState.today]} ·{" "}
+                  {formatDayRange(hoursByDay[openState.today])}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={colors.inkMuted} strokeWidth={2} />
+            </Pressable>
+          </View>
         ) : null}
 
         <View style={{ paddingHorizontal: 20, marginTop: 22 }}>
@@ -473,6 +543,14 @@ export default function ProfileScreen(): React.ReactElement {
           Pop's Villepinte - v1.0 - by Progix
         </Text>
       </View>
+
+      {/* ── HOURS MODAL ── */}
+      <HoursModal
+        visible={hoursOpen}
+        onClose={() => setHoursOpen(false)}
+        hours={hoursByDay}
+        todayKey={dayKeyFromDate(new Date())}
+      />
 
       {/* ── LOGOUT MODAL ── */}
       <Modal
@@ -630,54 +708,391 @@ export default function ProfileScreen(): React.ReactElement {
   );
 }
 
-type ReadOnlyInfoRowProps = {
-  icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
-  label: string;
-  value: string;
+type ShopStatusPillProps = {
+  state: ReturnType<typeof computeOpenState>;
 };
 
-function ReadOnlyInfoRow({
-  icon: Icon,
-  label,
-  value,
-}: ReadOnlyInfoRowProps): React.ReactElement {
+function ShopStatusPill({ state }: ShopStatusPillProps): React.ReactElement {
+  const tone = state.isOpen
+    ? {
+        bg: "#E8F8EE",
+        border: "#BFE8CC",
+        dot: colors.success,
+        title: "#0E7C3A",
+      }
+    : {
+        bg: "#FDECEA",
+        border: "#F7C6C1",
+        dot: colors.accent,
+        title: "#8B1A11",
+      };
   return (
-    <View>
-      <Text
-        style={{
-          fontFamily: font.bodyBold,
-          fontSize: 10,
-          letterSpacing: 2,
-          marginBottom: 8,
-          color: colors.inkMuted,
-          textTransform: "uppercase",
-        }}
-      >
-        {label}
-      </Text>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 14,
+        backgroundColor: tone.bg,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: tone.border,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+      }}
+    >
       <View
         style={{
-          backgroundColor: "#F5F5F5",
-          borderRadius: 12,
-          paddingHorizontal: 20,
-          paddingVertical: 18,
-          flexDirection: "row",
+          width: 38,
+          height: 38,
+          borderRadius: 19,
+          backgroundColor: colors.white,
           alignItems: "center",
-          gap: 12,
+          justifyContent: "center",
+          position: "relative",
         }}
       >
-        <Icon size={18} color={colors.primary} strokeWidth={2.5} />
+        <View
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: 6,
+            backgroundColor: tone.dot,
+          }}
+        />
+        {state.isOpen ? (
+          <View
+            style={{
+              position: "absolute",
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              backgroundColor: tone.dot,
+              opacity: 0.18,
+            }}
+          />
+        ) : null}
+      </View>
+      <View style={{ flex: 1 }}>
         <Text
           style={{
-            fontFamily: font.body,
-            fontSize: 16,
-            color: colors.ink,
-            flexShrink: 1,
+            fontFamily: font.bodyBold,
+            fontSize: 10,
+            letterSpacing: 1.5,
+            color: tone.title,
+            textTransform: "uppercase",
           }}
         >
-          {value}
+          {state.isOpen ? "Ouvert maintenant" : "Fermé"}
+        </Text>
+        <Text
+          numberOfLines={2}
+          style={{
+            fontFamily: font.bodySemi,
+            fontSize: 13,
+            color: colors.ink,
+            marginTop: 2,
+          }}
+        >
+          {state.hint}
         </Text>
       </View>
     </View>
+  );
+}
+
+type HoursModalProps = {
+  visible: boolean;
+  onClose: () => void;
+  hours: Record<DayKey, { closed: boolean; open: string; close: string }>;
+  todayKey: DayKey;
+};
+
+function HoursModal({
+  visible,
+  onClose,
+  hours,
+  todayKey,
+}: HoursModalProps): React.ReactElement {
+  const [selected, setSelected] = useState<DayKey>(todayKey);
+  // Re-anchor selection to today every time the sheet reopens.
+  useEffect(() => {
+    if (visible) setSelected(todayKey);
+  }, [visible, todayKey]);
+
+  const dayRow = hours[selected];
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <Pressable
+        onPress={onClose}
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.55)",
+          justifyContent: "flex-end",
+        }}
+      >
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={{
+            backgroundColor: colors.white,
+            borderTopLeftRadius: radius.xl,
+            borderTopRightRadius: radius.xl,
+            paddingTop: 14,
+            paddingBottom: 28,
+            paddingHorizontal: 20,
+            ...shadow.float,
+          }}
+        >
+          {/* Grabber */}
+          <View
+            style={{
+              alignSelf: "center",
+              width: 40,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: "#E0E0E0",
+              marginBottom: 16,
+            }}
+          />
+
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 18,
+            }}
+          >
+            <View>
+              <Text
+                style={{
+                  fontFamily: font.bodyBold,
+                  fontSize: 10,
+                  letterSpacing: 2,
+                  color: colors.inkMuted,
+                  textTransform: "uppercase",
+                }}
+              >
+                POP'S Villepinte
+              </Text>
+              <Text
+                style={{
+                  fontFamily: font.display,
+                  fontSize: 30,
+                  lineHeight: 32,
+                  color: colors.ink,
+                  letterSpacing: 1,
+                  marginTop: 2,
+                }}
+              >
+                HORAIRES
+              </Text>
+            </View>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityLabel="Fermer"
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: "#F5F5F5",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <X size={16} color={colors.ink} strokeWidth={2.5} />
+            </Pressable>
+          </View>
+
+          {/* Day chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+            style={{ marginHorizontal: -20, paddingHorizontal: 20, marginBottom: 16 }}
+          >
+            {DAY_KEYS.map((k) => {
+              const active = k === selected;
+              const isToday = k === todayKey;
+              return (
+                <Pressable
+                  key={k}
+                  onPress={() => {
+                    void Haptics.selectionAsync();
+                    setSelected(k);
+                  }}
+                  style={{
+                    height: 44,
+                    paddingHorizontal: 14,
+                    borderRadius: 22,
+                    backgroundColor: active ? colors.ink : "#F5F5F5",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "row",
+                    gap: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: font.bodyBold,
+                      fontSize: 12,
+                      letterSpacing: 1.5,
+                      color: active ? colors.primary : colors.ink,
+                    }}
+                  >
+                    {DAY_LABELS_SHORT[k]}
+                  </Text>
+                  {isToday ? (
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: active ? colors.primary : colors.accent,
+                      }}
+                    />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {/* Selected day detail */}
+          <View
+            style={{
+              backgroundColor: dayRow.closed ? "#FDECEA" : "#FFFBEB",
+              borderRadius: radius.lg,
+              borderWidth: 1,
+              borderColor: dayRow.closed ? "#F7C6C1" : "#F5E7A4",
+              paddingHorizontal: 18,
+              paddingVertical: 18,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <View
+              style={{
+                width: 46,
+                height: 46,
+                borderRadius: 23,
+                backgroundColor: dayRow.closed ? colors.accent : colors.primary,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Clock
+                size={20}
+                color={dayRow.closed ? colors.white : colors.ink}
+                strokeWidth={2.5}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontFamily: font.bodyBold,
+                  fontSize: 10,
+                  letterSpacing: 2,
+                  color: colors.inkMuted,
+                  textTransform: "uppercase",
+                }}
+              >
+                {DAY_LABELS_LONG[selected]}
+                {selected === todayKey ? " · aujourd'hui" : ""}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: font.display,
+                  fontSize: 30,
+                  lineHeight: 32,
+                  color: colors.ink,
+                  marginTop: 4,
+                }}
+              >
+                {formatDayRange(dayRow).toUpperCase()}
+              </Text>
+            </View>
+          </View>
+
+          {/* Full week list */}
+          <View style={{ marginTop: 18 }}>
+            <Text
+              style={{
+                fontFamily: font.bodyBold,
+                fontSize: 10,
+                letterSpacing: 2,
+                color: colors.inkMuted,
+                textTransform: "uppercase",
+                marginBottom: 8,
+              }}
+            >
+              Toute la semaine
+            </Text>
+            {DAY_KEYS.map((k, idx) => {
+              const row = hours[k];
+              const isToday = k === todayKey;
+              return (
+                <Pressable
+                  key={k}
+                  onPress={() => {
+                    void Haptics.selectionAsync();
+                    setSelected(k);
+                  }}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingVertical: 12,
+                    borderTopWidth: idx === 0 ? 0 : 1,
+                    borderTopColor: "#F2F2F2",
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    {isToday ? (
+                      <View
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: 3,
+                          backgroundColor: colors.accent,
+                        }}
+                      />
+                    ) : (
+                      <View style={{ width: 6 }} />
+                    )}
+                    <Text
+                      style={{
+                        fontFamily: isToday ? font.bodyBold : font.bodySemi,
+                        fontSize: 14,
+                        color: colors.ink,
+                      }}
+                    >
+                      {DAY_LABELS_LONG[k]}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontFamily: font.bodySemi,
+                      fontSize: 13,
+                      color: row.closed ? colors.accent : colors.ink,
+                    }}
+                  >
+                    {formatDayRange(row)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }

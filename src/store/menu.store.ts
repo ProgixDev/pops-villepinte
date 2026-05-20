@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { menuApi } from "@/lib/api";
+import { menuApi, type ShopSettings } from "@/lib/api";
 import type {
   Accompagnement,
   Category,
@@ -18,6 +18,7 @@ type MenuState = {
   signatures: Product[];
   advice: Product[];
   accompagnements: Accompagnement[];
+  shopSettings: ShopSettings | null;
   loading: boolean;
   error: string | null;
   fetchMenu: () => Promise<void>;
@@ -36,6 +37,7 @@ export const useMenuStore = create<MenuState>()(
       signatures: [],
       advice: [],
       accompagnements: [],
+      shopSettings: null,
       loading: false,
       error: null,
 
@@ -49,6 +51,7 @@ export const useMenuStore = create<MenuState>()(
             signaturesResult,
             adviceResult,
             accompagnementsResult,
+            shopSettingsResult,
           ] = await Promise.all([
             menuApi.getCategories(),
             menuApi.getProducts(),
@@ -56,6 +59,7 @@ export const useMenuStore = create<MenuState>()(
             menuApi.getSignatures().catch(() => [] as unknown[]),
             menuApi.getAdvice().catch(() => [] as unknown[]),
             menuApi.getAccompagnements().catch(() => [] as unknown[]),
+            menuApi.getShopSettings().catch(() => null),
           ]);
           set({
             categories: categories as unknown as Category[],
@@ -64,6 +68,7 @@ export const useMenuStore = create<MenuState>()(
             signatures: signaturesResult as unknown as Product[],
             advice: adviceResult as unknown as Product[],
             accompagnements: accompagnementsResult as unknown as Accompagnement[],
+            shopSettings: shopSettingsResult,
             loading: false,
           });
         } catch (e: unknown) {
@@ -104,8 +109,9 @@ export const useMenuStore = create<MenuState>()(
         signatures: s.signatures,
         advice: s.advice,
         accompagnements: s.accompagnements,
+        shopSettings: s.shopSettings,
       }),
-      version: 2,
+      version: 3,
     },
   ),
 );

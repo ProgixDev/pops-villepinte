@@ -1,25 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import {
   ArrowLeft,
   Bike,
   Check,
-  ChevronRight,
   Clock,
   MapPin,
   Phone,
   Route,
-  Search,
   ShieldCheck,
   Store as StoreIcon,
   User,
@@ -29,23 +25,22 @@ import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import OrderConfirmation from "@/components/order/OrderConfirmation";
-import StaticMap from "@/components/checkout/StaticMap";
+import DeliveryMapPreview from "@/components/checkout/DeliveryMapPreview";
 import { isGuestName } from "@/constants/profile";
 import { ROUTES } from "@/constants/routes";
 import { colors, font, radius } from "@/constants/theme";
 import {
-  DELIVERY_FEE_EUR,
-  DELIVERY_MAX_KM,
+  DEFAULT_DELIVERY_BASE_FEE_EUR,
+  DEFAULT_DELIVERY_PER_KM_EUR,
   STORE_ADDRESS,
-  STORE_LAT,
-  STORE_LNG,
+  computeDeliveryFee,
   distanceFromStoreKm,
-  searchFrenchAddresses,
   type DeliveryAddress,
 } from "@/lib/delivery";
 import { formatPriceEUR } from "@/lib/format";
 import { formatFrenchMobile } from "@/lib/phone";
 import { getLineUnitPrice, useCartStore } from "@/store/cart.store";
+import { useDeliveryDraftStore } from "@/store/deliveryDraft.store";
 import { useMenuStore } from "@/store/menu.store";
 import { useOrdersStore } from "@/store/orders.store";
 import { useProfileStore } from "@/store/profile.store";
@@ -69,13 +64,8 @@ export default function CheckoutScreen(): React.ReactElement {
   const formattedPhone = profile.phone ? formatFrenchMobile(profile.phone) : "";
 
   const [mode, setMode] = useState<Mode>("pickup");
-  const [addressQuery, setAddressQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<DeliveryAddress[]>([]);
-  const [selectedAddress, setSelectedAddress] =
-    useState<DeliveryAddress | null>(null);
-  const [addressLoading, setAddressLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const searchSeq = useRef(0);
+  const selectedAddress = useDeliveryDraftStore((s) => s.picked);
+  const clearPickedAddress = useDeliveryDraftStore((s) => s.clear);
 
   const [confirmed, setConfirmed] = useState<boolean>(false);
   const [confirmError, setConfirmError] = useState<string | undefined>();
@@ -83,44 +73,23 @@ export default function CheckoutScreen(): React.ReactElement {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
-  // Debounced BAN search whenever the typed query changes.
-  useEffect(() => {
-    if (mode !== "delivery") return;
-    const q = addressQuery.trim();
-    if (q.length < 3 || selectedAddress?.label === q) {
-      setSuggestions([]);
-      setAddressLoading(false);
-      return;
-    }
-    const mySeq = ++searchSeq.current;
-    setAddressLoading(true);
-    const handle = setTimeout(() => {
-      void searchFrenchAddresses(q)
-        .then((results) => {
-          // Drop stale responses if a newer query already fired.
-          if (mySeq !== searchSeq.current) return;
-          setSuggestions(results);
-        })
-        .catch(() => {
-          if (mySeq !== searchSeq.current) return;
-          setSuggestions([]);
-        })
-        .finally(() => {
-          if (mySeq !== searchSeq.current) return;
-          setAddressLoading(false);
-        });
-    }, 280);
-    return () => clearTimeout(handle);
-  }, [addressQuery, mode, selectedAddress?.label]);
+  const shopSettings = useMenuStore((s) => s.shopSettings);
+  const baseFee = Number(
+    shopSettings?.delivery_base_fee_eur ?? DEFAULT_DELIVERY_BASE_FEE_EUR,
+  );
+  const perKmRate = Number(
+    shopSettings?.delivery_per_km_eur ?? DEFAULT_DELIVERY_PER_KM_EUR,
+  );
 
   const distanceKm = useMemo(() => {
     if (mode !== "delivery" || !selectedAddress) return null;
     return distanceFromStoreKm(selectedAddress.lat, selectedAddress.lng);
   }, [mode, selectedAddress]);
 
-  const isOutOfZone =
-    distanceKm !== null && distanceKm > DELIVERY_MAX_KM;
-  const deliveryFee = mode === "delivery" && !isOutOfZone ? DELIVERY_FEE_EUR : 0;
+  const deliveryFee =
+    mode === "delivery" && distanceKm !== null
+      ? computeDeliveryFee(distanceKm, baseFee, perKmRate)
+      : 0;
   const grandTotal = total + deliveryFee;
 
   const handlePickMode = (next: Mode): void => {
@@ -131,18 +100,25 @@ export default function CheckoutScreen(): React.ReactElement {
     setSubmitError(undefined);
   };
 
-  const handleSelectAddress = (addr: DeliveryAddress): void => {
+  const handleOpenPicker = (
+    initial: { lat: number; lng: number } | null,
+  ): void => {
     void Haptics.selectionAsync();
-    setSelectedAddress(addr);
-    setAddressQuery(addr.label);
-    setSuggestions([]);
-    setShowSuggestions(false);
+    const params: Record<string, string> = {};
+    if (initial) {
+      params.lat = String(initial.lat);
+      params.lng = String(initial.lng);
+    }
+    // Typed-routes index regenerates on next dev-server start; cast until then.
+    router.push({
+      pathname: "/delivery-picker" as never,
+      params,
+    });
   };
 
   const handleClearAddress = (): void => {
-    setSelectedAddress(null);
-    setAddressQuery("");
-    setSuggestions([]);
+    void Haptics.selectionAsync();
+    clearPickedAddress();
   };
 
   useEffect(() => {
@@ -168,8 +144,7 @@ export default function CheckoutScreen(): React.ReactElement {
     [items],
   );
 
-  const deliveryReady =
-    mode === "pickup" || (selectedAddress !== null && !isOutOfZone);
+  const deliveryReady = mode === "pickup" || selectedAddress !== null;
   const canConfirm =
     registeredName.length >= 2 && confirmed && deliveryReady;
 
@@ -183,14 +158,7 @@ export default function CheckoutScreen(): React.ReactElement {
     }
     if (mode === "delivery") {
       if (!selectedAddress) {
-        setSubmitError("Choisis une adresse de livraison dans les suggestions.");
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        return;
-      }
-      if (isOutOfZone) {
-        setSubmitError(
-          `Adresse hors zone (~${distanceKm?.toFixed(1)} km). Max ${DELIVERY_MAX_KM} km.`,
-        );
+        setSubmitError("Choisis une adresse de livraison sur la carte.");
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
@@ -220,6 +188,7 @@ export default function CheckoutScreen(): React.ReactElement {
       const newOrder = await placeOrder(items, registeredName, delivery);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       clearCart();
+      clearPickedAddress();
       setPendingOrderId(newOrder.id);
       setShowConfirmation(true);
     } catch (e: unknown) {
@@ -378,7 +347,11 @@ export default function CheckoutScreen(): React.ReactElement {
               icon={Bike}
               title="Livraison"
               subtitle="On t'apporte"
-              meta={`+${DELIVERY_FEE_EUR}€`}
+              meta={
+                perKmRate > 0
+                  ? `dès ${baseFee.toFixed(0)}€`
+                  : `+${baseFee.toFixed(0)}€`
+              }
               onPress={() => handlePickMode("delivery")}
             />
           </View>
@@ -438,24 +411,14 @@ export default function CheckoutScreen(): React.ReactElement {
           </View>
         ) : (
           <DeliveryPanel
-            addressQuery={addressQuery}
-            setAddressQuery={(v) => {
-              setAddressQuery(v);
-              if (selectedAddress && selectedAddress.label !== v) {
-                setSelectedAddress(null);
-              }
-              setShowSuggestions(true);
-            }}
-            onFocus={() => setShowSuggestions(true)}
-            onClear={handleClearAddress}
-            suggestions={suggestions}
-            loading={addressLoading}
-            showSuggestions={showSuggestions}
             selected={selectedAddress}
             distanceKm={distanceKm}
-            isOutOfZone={isOutOfZone}
+            deliveryFee={deliveryFee}
+            baseFee={baseFee}
+            perKmRate={perKmRate}
             estimatedMinutes={estimatedMinutes + 10}
-            onPick={handleSelectAddress}
+            onOpenPicker={handleOpenPicker}
+            onClear={handleClearAddress}
           />
         )}
 
@@ -902,240 +865,90 @@ function InfoTile({ icon: Icon, value, label }: InfoTileProps): React.ReactEleme
 }
 
 type DeliveryPanelProps = {
-  addressQuery: string;
-  setAddressQuery: (v: string) => void;
-  onFocus: () => void;
-  onClear: () => void;
-  suggestions: DeliveryAddress[];
-  loading: boolean;
-  showSuggestions: boolean;
   selected: DeliveryAddress | null;
   distanceKm: number | null;
-  isOutOfZone: boolean;
+  deliveryFee: number;
+  baseFee: number;
+  perKmRate: number;
   estimatedMinutes: number;
-  onPick: (a: DeliveryAddress) => void;
+  onOpenPicker: (initial: { lat: number; lng: number } | null) => void;
+  onClear: () => void;
 };
 
 function DeliveryPanel({
-  addressQuery,
-  setAddressQuery,
-  onFocus,
-  onClear,
-  suggestions,
-  loading,
-  showSuggestions,
   selected,
   distanceKm,
-  isOutOfZone,
+  deliveryFee,
+  baseFee,
+  perKmRate,
   estimatedMinutes,
-  onPick,
+  onOpenPicker,
+  onClear,
 }: DeliveryPanelProps): React.ReactElement {
   return (
     <View style={{ paddingHorizontal: 20, paddingVertical: 16, gap: 14 }}>
-      {/* Search input */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          backgroundColor: "#F5F5F5",
-          borderRadius: radius.lg,
-          paddingHorizontal: 14,
-          height: 52,
-          gap: 10,
-          borderWidth: selected ? 2 : 0,
-          borderColor: selected ? colors.primary : "transparent",
-        }}
-      >
-        <Search size={18} color={colors.inkMuted} strokeWidth={2} />
-        <TextInput
-          value={addressQuery}
-          onChangeText={setAddressQuery}
-          onFocus={onFocus}
-          placeholder="Numéro et rue, ville…"
-          placeholderTextColor={colors.inkMuted}
-          autoCapitalize="words"
-          autoCorrect={false}
-          returnKeyType="search"
-          style={{
-            flex: 1,
-            fontFamily: font.bodySemi,
-            fontSize: 14,
-            color: colors.ink,
-            paddingVertical: 12,
-          }}
-        />
-        {loading ? (
-          <ActivityIndicator size="small" color={colors.inkMuted} />
-        ) : addressQuery.length > 0 ? (
-          <Pressable onPress={onClear} hitSlop={10}>
-            <X size={16} color={colors.inkMuted} strokeWidth={2} />
-          </Pressable>
-        ) : null}
-      </View>
+      <DeliveryMapPreview selected={selected} onPress={onOpenPicker} />
 
-      {/* Suggestions dropdown */}
-      {showSuggestions && suggestions.length > 0 && !selected ? (
+      {selected ? (
         <View
           style={{
-            backgroundColor: colors.white,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            backgroundColor: "#FFFBEB",
             borderRadius: radius.lg,
+            padding: 14,
             borderWidth: 1,
-            borderColor: "#EFEFEF",
-            overflow: "hidden",
+            borderColor: "#F5E7A4",
           }}
         >
-          {suggestions.map((s, idx) => (
-            <Pressable
-              key={`${s.lat}-${s.lng}-${idx}`}
-              onPress={() => onPick(s)}
-              style={({ pressed }) => ({
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-                backgroundColor: pressed ? "#FAFAF6" : colors.white,
-                borderTopWidth: idx === 0 ? 0 : 1,
-                borderTopColor: "#F2F2F2",
-              })}
-            >
-              <View
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
-                  backgroundColor: "#F5F5F5",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <MapPin size={15} color={colors.ink} strokeWidth={2} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{ fontFamily: font.bodySemi, fontSize: 13, color: colors.ink }}
-                >
-                  {s.label}
-                </Text>
-                {s.postcode && s.city ? (
-                  <Text
-                    style={{ fontFamily: font.body, fontSize: 11, color: colors.inkMuted, marginTop: 1 }}
-                  >
-                    {s.postcode} · {s.city}
-                  </Text>
-                ) : null}
-              </View>
-              <ChevronRight size={14} color={colors.inkMuted} strokeWidth={2} />
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-
-      {/* Selected address + map + stats */}
-      {selected ? (
-        <View style={{ gap: 12 }}>
-          <StaticMap
-            lat={selected.lat}
-            lng={selected.lng}
-            secondaryLat={STORE_LAT}
-            secondaryLng={STORE_LNG}
-            height={200}
-          />
-
           <View
             style={{
-              flexDirection: "row",
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: colors.primary,
               alignItems: "center",
-              gap: 12,
-              backgroundColor: isOutOfZone ? "#FFF1F0" : "#FFFBEB",
-              borderRadius: radius.lg,
-              padding: 14,
-              borderWidth: 1,
-              borderColor: isOutOfZone ? "#FBD3CF" : "#F5E7A4",
+              justifyContent: "center",
             }}
           >
-            <View
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: isOutOfZone ? colors.accent : colors.primary,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <MapPin size={16} color={isOutOfZone ? colors.white : colors.ink} strokeWidth={2.5} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text
-                numberOfLines={2}
-                style={{ fontFamily: font.bodyBold, fontSize: 13, color: colors.ink }}
-              >
-                {selected.label}
-              </Text>
-              {isOutOfZone ? (
-                <Text
-                  style={{
-                    fontFamily: font.bodySemi,
-                    fontSize: 11,
-                    color: colors.accent,
-                    marginTop: 2,
-                  }}
-                >
-                  Hors zone · max {DELIVERY_MAX_KM} km
-                </Text>
-              ) : (
-                <Text
-                  style={{
-                    fontFamily: font.body,
-                    fontSize: 11,
-                    color: colors.inkMuted,
-                    marginTop: 2,
-                  }}
-                >
-                  {selected.postcode && selected.city
-                    ? `${selected.postcode} · ${selected.city}`
-                    : "Adresse confirmée"}
-                </Text>
-              )}
-            </View>
-            <Pressable
-              onPress={onClear}
-              hitSlop={10}
-              accessibilityLabel="Changer l'adresse"
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: colors.white,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <X size={14} color={colors.ink} strokeWidth={2.5} />
-            </Pressable>
+            <MapPin size={16} color={colors.ink} strokeWidth={2.5} />
           </View>
-
-          {!isOutOfZone ? (
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <DeliveryStat
-                icon={Route}
-                value={`${distanceKm?.toFixed(1) ?? "—"}`}
-                unit="KM"
-              />
-              <DeliveryStat
-                icon={Clock}
-                value={`${estimatedMinutes}`}
-                unit="MIN"
-              />
-              <DeliveryStat
-                icon={Bike}
-                value={`${DELIVERY_FEE_EUR}€`}
-                unit="LIVRAISON"
-              />
-            </View>
-          ) : null}
+          <View style={{ flex: 1 }}>
+            <Text
+              numberOfLines={2}
+              style={{ fontFamily: font.bodyBold, fontSize: 13, color: colors.ink }}
+            >
+              {selected.label}
+            </Text>
+            <Text
+              style={{
+                fontFamily: font.body,
+                fontSize: 11,
+                color: colors.inkMuted,
+                marginTop: 2,
+              }}
+            >
+              {selected.postcode && selected.city
+                ? `${selected.postcode} · ${selected.city}`
+                : "Adresse confirmée"}
+            </Text>
+          </View>
+          <Pressable
+            onPress={onClear}
+            hitSlop={10}
+            accessibilityLabel="Changer l'adresse"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: colors.white,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X size={14} color={colors.ink} strokeWidth={2.5} />
+          </Pressable>
         </View>
       ) : (
         <View
@@ -1162,7 +975,7 @@ function DeliveryPanel({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontFamily: font.bodyBold, fontSize: 13, color: colors.ink }}>
-              Livraison Villepinte & alentours
+              Livraison à domicile
             </Text>
             <Text
               style={{
@@ -1172,11 +985,36 @@ function DeliveryPanel({
                 marginTop: 2,
               }}
             >
-              {DELIVERY_FEE_EUR}€ jusqu'à {DELIVERY_MAX_KM} km · Cash à la livraison
+              {perKmRate > 0
+                ? `${baseFee.toFixed(2).replace(".", ",")}€ + ${perKmRate
+                    .toFixed(2)
+                    .replace(".", ",")}€/km`
+                : `Forfait ${baseFee.toFixed(2).replace(".", ",")}€`}{" "}
+              · Cash à la livraison
             </Text>
           </View>
         </View>
       )}
+
+      {selected ? (
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <DeliveryStat
+            icon={Route}
+            value={`${distanceKm?.toFixed(1) ?? "—"}`}
+            unit="KM"
+          />
+          <DeliveryStat
+            icon={Clock}
+            value={`${estimatedMinutes}`}
+            unit="MIN"
+          />
+          <DeliveryStat
+            icon={Bike}
+            value={`${deliveryFee.toFixed(2).replace(".", ",")}€`}
+            unit="LIVRAISON"
+          />
+        </View>
+      ) : null}
     </View>
   );
 }

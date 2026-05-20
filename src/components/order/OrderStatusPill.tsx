@@ -28,6 +28,11 @@ const CONFIG: Record<OrderStatus, PillConfig> = {
     text: colors.ink,
   },
   ready: { label: "Prête !", bg: colors.success, text: colors.surface },
+  handed_to_livreur: {
+    label: "Avec le livreur",
+    bg: colors.primaryDark,
+    text: colors.ink,
+  },
   picked_up: { label: "Récupérée", bg: colors.success, text: colors.surface },
   cancelled: { label: "Annulée", bg: colors.error, text: colors.surface },
 };

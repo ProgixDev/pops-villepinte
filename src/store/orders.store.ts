@@ -63,6 +63,7 @@ type OrdersState = {
   fetchOrders: () => Promise<void>;
   fetchOrderById: (id: string) => Promise<Order | null>;
   cancelOrder: (id: string) => Promise<void>;
+  confirmPickedUp: (id: string) => Promise<Order>;
   refreshActive: () => Promise<void>;
   clearError: () => void;
 };
@@ -142,6 +143,24 @@ export const useOrdersStore = create<OrdersState>()(
           return order;
         } catch {
           return null;
+        }
+      },
+
+      confirmPickedUp: async (id: string) => {
+        try {
+          const data = await ordersApi.confirmPickedUp(id);
+          const order = toOrder(data);
+          // Picked-up is terminal — drop from active, prepend to history.
+          set((state) => ({
+            active: state.active?.id === id ? null : state.active,
+            history: [order, ...state.history.filter((o) => o.id !== id)],
+          }));
+          return order;
+        } catch (e: unknown) {
+          const message =
+            e instanceof Error ? e.message : "Confirmation impossible";
+          set({ error: message });
+          throw e;
         }
       },
 

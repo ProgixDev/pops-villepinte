@@ -9,28 +9,33 @@ type Step = {
   activeSubtitle?: string;
 };
 
-const STEPS: Step[] = [
+const PICKUP_STEPS: Step[] = [
   { key: "received", label: "Commande reçue", activeSubtitle: "Votre commande est enregistrée." },
   { key: "preparing", label: "En préparation", activeSubtitle: "Votre commande est en cours…" },
   { key: "ready", label: "Prête à retirer", activeSubtitle: "Direction le comptoir !" },
   { key: "picked_up", label: "Récupérée", activeSubtitle: "Bon appétit !" },
 ];
 
-const ORDER: OrderStatus[] = ["received", "preparing", "ready", "picked_up"];
-
-function stepIndex(status: OrderStatus): number {
-  const idx = ORDER.indexOf(status);
-  return idx === -1 ? -1 : idx;
-}
+const DELIVERY_STEPS: Step[] = [
+  { key: "received", label: "Commande reçue", activeSubtitle: "Votre commande est enregistrée." },
+  { key: "preparing", label: "En préparation", activeSubtitle: "Votre commande est en cours…" },
+  { key: "ready", label: "Prête à partir", activeSubtitle: "Le livreur va prendre le sac." },
+  { key: "handed_to_livreur", label: "Avec le livreur", activeSubtitle: "Il est en route vers toi." },
+  { key: "picked_up", label: "Livrée", activeSubtitle: "Bon appétit !" },
+];
 
 export type OrderTimelineProps = {
   status: OrderStatus;
+  pickupMode?: "pickup" | "delivery";
 };
 
 export default function OrderTimeline({
   status,
+  pickupMode = "pickup",
 }: OrderTimelineProps): React.ReactElement {
-  const current = stepIndex(status);
+  const STEPS = pickupMode === "delivery" ? DELIVERY_STEPS : PICKUP_STEPS;
+  const ORDER = STEPS.map((s) => s.key);
+  const current = ORDER.indexOf(status);
   const isCancelled = status === "cancelled";
 
   return (

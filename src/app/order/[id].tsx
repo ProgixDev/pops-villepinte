@@ -40,10 +40,12 @@ export default function OrderDetailScreen(): React.ReactElement {
   });
   const refreshActive = useOrdersStore((s) => s.refreshActive);
   const fetchOrderById = useOrdersStore((s) => s.fetchOrderById);
+  const confirmPickedUp = useOrdersStore((s) => s.confirmPickedUp);
 
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const countdown = useCountdown(
     order?.createdAt ?? new Date().toISOString(),
@@ -69,17 +71,32 @@ export default function OrderDetailScreen(): React.ReactElement {
     return () => clearInterval(poll);
   }, [order?.status, id, refreshActive, fetchOrderById]);
 
+  const isDelivery = order?.pickupMode === "delivery";
+
   const handleEnRoute = useCallback(() => {
     void Haptics.selectionAsync();
-    setToastMessage("On t'attend !");
+    setToastMessage(isDelivery ? "On l'apporte !" : "On t'attend !");
     setToastVisible(true);
-  }, []);
+  }, [isDelivery]);
 
-  const handlePickedUp = useCallback(() => {
+  const handlePickedUp = useCallback(async () => {
     if (!order) return;
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setShowSuccess(true);
-  }, [order]);
+    if (confirming) return;
+    setConfirming(true);
+    try {
+      await confirmPickedUp(order.id);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowSuccess(true);
+    } catch (e) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setToastMessage(
+        e instanceof Error ? e.message : "Confirmation impossible",
+      );
+      setToastVisible(true);
+    } finally {
+      setConfirming(false);
+    }
+  }, [order, confirming, confirmPickedUp]);
 
   const handleSuccessFinish = useCallback(() => {
     if (!order) return;
@@ -119,11 +136,19 @@ export default function OrderDetailScreen(): React.ReactElement {
 
   const isPreparing = order.status === ORDER_STATUS.PREPARING;
   const isReady = order.status === ORDER_STATUS.READY;
+  const isHandedToLivreur = order.status === ORDER_STATUS.HANDED_TO_LIVREUR;
   const isTerminal = isTerminalOrderStatus(order.status);
 
-  const showCtaPreparing = isPreparing;
-  const showCtaReady = isReady;
-  const showCta = (showCtaPreparing || showCtaReady) && !isTerminal;
+  // CTA visibility:
+  //  pickup orders: "Je suis en route" while preparing, "J'ai récupéré" when ready
+  //  delivery orders: "Je suis là" while in transit, "J'ai récupéré" once the
+  //                   livreur has handed off the bag
+  const showPickupCta =
+    !isDelivery && !isTerminal && (isPreparing || isReady);
+  const showDeliveryCta =
+    isDelivery && !isTerminal && (isPreparing || isHandedToLivreur);
+  const showCta = showPickupCta || showDeliveryCta;
+  const canConfirmReceipt = isDelivery ? isHandedToLivreur : isReady;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
@@ -182,7 +207,7 @@ export default function OrderDetailScreen(): React.ReactElement {
         </View>
 
         {/* Timeline */}
-        <OrderTimeline status={order.status} />
+        <OrderTimeline status={order.status} pickupMode={order.pickupMode} />
 
         {/* Pickup instructions */}
         <View style={{ marginTop: 8 }}>
@@ -228,9 +253,14 @@ export default function OrderDetailScreen(): React.ReactElement {
           <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel={
-              isReady ? "Confirmer la récupération" : "Signaler que vous êtes en route"
+              canConfirmReceipt
+                ? "Confirmer la récupération"
+                : isDelivery
+                  ? "Signaler que vous êtes prêt à recevoir"
+                  : "Signaler que vous êtes en route"
             }
-            onPress={isReady ? handlePickedUp : handleEnRoute}
+            onPress={canConfirmReceipt ? handlePickedUp : handleEnRoute}
+            disabled={confirming}
             onPressIn={() => {
               ctaScale.value = withTiming(0.98, { duration: 120 });
             }}
@@ -242,10 +272,10 @@ export default function OrderDetailScreen(): React.ReactElement {
               {
                 paddingHorizontal: 24,
                 paddingVertical: 18,
-                backgroundColor: isReady
+                backgroundColor: canConfirmReceipt
                   ? colors.success
                   : colors.border,
-                ...(isReady
+                ...(canConfirmReceipt
                   ? {
                       shadowColor: colors.success,
                       shadowOffset: { width: 0, height: 12 },
@@ -254,6 +284,7 @@ export default function OrderDetailScreen(): React.ReactElement {
                       elevation: 8,
                     }
                   : {}),
+                opacity: confirming ? 0.7 : 1,
               },
               ctaStyle,
             ]}
@@ -264,13 +295,17 @@ export default function OrderDetailScreen(): React.ReactElement {
                 fontFamily: "Poppins_700Bold",
                 fontSize: 13,
                 letterSpacing: 2,
-                color: isReady ? colors.surface : colors.ink,
+                color: canConfirmReceipt ? colors.surface : colors.ink,
                 textAlign: "center",
               }}
             >
-              {isReady
-                ? "J'ai récupéré ma commande"
-                : "Je suis en route"}
+              {confirming
+                ? "Confirmation…"
+                : canConfirmReceipt
+                  ? "J'ai récupéré ma commande"
+                  : isDelivery
+                    ? "Je suis prêt à recevoir"
+                    : "Je suis en route"}
             </Text>
           </AnimatedPressable>
         </View>

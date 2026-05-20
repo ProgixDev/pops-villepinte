@@ -75,7 +75,9 @@ export class MenuService {
   async getShopSettings() {
     const { data, error } = await this.supabase
       .from('shop_settings')
-      .select('open_days, open_hours, updated_at')
+      .select(
+        'open_days, open_hours, hours_by_day, delivery_base_fee_eur, delivery_per_km_eur, updated_at',
+      )
       .eq('id', 1)
       .single();
 

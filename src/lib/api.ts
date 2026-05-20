@@ -100,6 +100,8 @@ export const ordersApi = {
   get: (id: string) => api<OrderData>(`/orders/${id}`),
   cancel: (id: string) =>
     api<OrderData>(`/orders/${id}/cancel`, { method: "PATCH" }),
+  confirmPickedUp: (id: string) =>
+    api<OrderData>(`/orders/${id}/picked-up`, { method: "PATCH" }),
 };
 
 // ─── API Types ───────────────────────────────────────────────────────
@@ -141,9 +143,15 @@ export type Product = {
   product_supplements: { supplement_id: string; supplements: Supplement }[];
 };
 
+export type DayHours = { closed: boolean; open: string; close: string };
+export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
 export type ShopSettings = {
   open_days: string;
   open_hours: string;
+  hours_by_day?: Partial<Record<DayKey, DayHours>>;
+  delivery_base_fee_eur?: number;
+  delivery_per_km_eur?: number;
   updated_at: string;
 };
 

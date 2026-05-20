@@ -3,8 +3,11 @@ export type OrderStatus =
   | 'received'
   | 'preparing'
   | 'ready'
+  | 'handed_to_livreur'
   | 'picked_up'
   | 'cancelled';
+
+export type PickupMode = 'pickup' | 'delivery';
 export type AppRole = 'customer' | 'admin';
 
 export interface Category {

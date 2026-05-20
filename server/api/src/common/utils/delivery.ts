@@ -1,6 +1,7 @@
 /**
- * Delivery fee + zone helpers. Single source of truth for both the order
- * creation path and the public "is this address deliverable?" surface.
+ * Delivery fee helpers. The numeric base + per-km rate now come from
+ * `shop_settings` (editable by the super-admin), so this file only owns the
+ * geometry — the store coordinates and the haversine math.
  */
 
 // POP'S Villepinte storefront — Avenue Gabriel Péri, 93420 Villepinte.
@@ -8,13 +9,10 @@
 export const STORE_LAT = 48.962665;
 export const STORE_LNG = 2.541223;
 
-// Flat fee inside the zone; we keep it simple — no per-km tiering until
-// operations actually demand it.
-export const DELIVERY_FEE_EUR = 3;
-
-// Hard ceiling: anything beyond this is "hors zone" and the API refuses to
-// create the order.
-export const DELIVERY_MAX_KM = 8;
+// Fallback values used when the shop_settings row is missing the columns
+// (e.g. legacy DB). The migration sets a default of 3€ base / 0€ per km.
+export const DEFAULT_DELIVERY_BASE_FEE_EUR = 3;
+export const DEFAULT_DELIVERY_PER_KM_EUR = 0;
 
 /** Great-circle distance in kilometres. */
 export function haversineKm(
@@ -37,4 +35,14 @@ export function haversineKm(
 
 export function distanceFromStoreKm(lat: number, lng: number): number {
   return haversineKm(STORE_LAT, STORE_LNG, lat, lng);
+}
+
+/** fee = base + km * rate, rounded to 2 decimals. */
+export function computeDeliveryFee(
+  km: number,
+  baseFee: number,
+  perKmRate: number,
+): number {
+  const raw = Math.max(0, baseFee) + Math.max(0, km) * Math.max(0, perKmRate);
+  return Math.round(raw * 100) / 100;
 }

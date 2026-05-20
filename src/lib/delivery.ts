@@ -1,13 +1,24 @@
-// Mirror of server/api/src/common/utils/delivery.ts — keep these constants
-// in sync. The mobile app uses them to preview fee + zone before the user
-// taps "confirmer", server-side validation is authoritative.
+// Mirror of server/api/src/common/utils/delivery.ts — only the geometry lives
+// here. Pricing (base fee + per-km rate) is fetched from shop_settings so the
+// super-admin can change it without a redeploy.
 
 export const STORE_LAT = 48.962665;
 export const STORE_LNG = 2.541223;
 export const STORE_ADDRESS = "Avenue Gabriel Péri, 93420 Villepinte";
 
-export const DELIVERY_FEE_EUR = 3;
-export const DELIVERY_MAX_KM = 8;
+// Used only if shop_settings hasn't loaded yet.
+export const DEFAULT_DELIVERY_BASE_FEE_EUR = 3;
+export const DEFAULT_DELIVERY_PER_KM_EUR = 0;
+
+export function computeDeliveryFee(
+  km: number,
+  baseFee: number,
+  perKm: number,
+): number {
+  const raw =
+    Math.max(0, baseFee) + Math.max(0, km) * Math.max(0, perKm);
+  return Math.round(raw * 100) / 100;
+}
 
 export function haversineKm(
   lat1: number,

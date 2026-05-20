@@ -113,6 +113,10 @@ export default function RootLayout(): React.ReactNode {
           <Stack.Screen name="product/[id]" options={{ presentation: "modal" }} />
           <Stack.Screen name="cart" options={{ presentation: "modal" }} />
           <Stack.Screen name="checkout" />
+          <Stack.Screen
+            name="delivery-picker"
+            options={{ presentation: "modal" }}
+          />
           <Stack.Screen name="order/[id]" />
           <Stack.Screen name="settings/[slug]" />
         </Stack>

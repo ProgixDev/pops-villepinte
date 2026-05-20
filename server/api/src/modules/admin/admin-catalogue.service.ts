@@ -422,10 +422,13 @@ export class AdminCatalogueService {
   }
 
   // Shop settings (single-row table, id=1)
+  private static readonly SHOP_SELECT =
+    'open_days, open_hours, hours_by_day, delivery_base_fee_eur, delivery_per_km_eur, updated_at';
+
   async getShopSettings() {
     const { data, error } = await this.supabase
       .from('shop_settings')
-      .select('open_days, open_hours, updated_at')
+      .select(AdminCatalogueService.SHOP_SELECT)
       .eq('id', 1)
       .single();
 
@@ -439,12 +442,19 @@ export class AdminCatalogueService {
     };
     if (dto.open_days !== undefined) patch.open_days = dto.open_days;
     if (dto.open_hours !== undefined) patch.open_hours = dto.open_hours;
+    if (dto.hours_by_day !== undefined) patch.hours_by_day = dto.hours_by_day;
+    if (dto.delivery_base_fee_eur !== undefined) {
+      patch.delivery_base_fee_eur = dto.delivery_base_fee_eur;
+    }
+    if (dto.delivery_per_km_eur !== undefined) {
+      patch.delivery_per_km_eur = dto.delivery_per_km_eur;
+    }
 
     const { data, error } = await this.supabase
       .from('shop_settings')
       .update(patch)
       .eq('id', 1)
-      .select('open_days, open_hours, updated_at')
+      .select(AdminCatalogueService.SHOP_SELECT)
       .single();
 
     if (error) throw error;

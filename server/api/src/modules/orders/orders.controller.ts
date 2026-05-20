@@ -39,4 +39,14 @@ export class OrdersController {
   ) {
     return this.ordersService.cancelCustomerOrder(user.id, id);
   }
+
+  // Customer self-confirms reception. RLS already restricts the row to the
+  // caller; the service double-checks the lifecycle (pickup vs delivery).
+  @Patch(':id/picked-up')
+  confirmPickedUp(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.ordersService.confirmCustomerPickedUp(user.id, id);
+  }
 }

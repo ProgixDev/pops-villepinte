@@ -13,17 +13,18 @@ import {
   recalculateOrderTotal,
 } from '../../common/utils/price';
 import {
-  DELIVERY_FEE_EUR,
-  DELIVERY_MAX_KM,
+  DEFAULT_DELIVERY_BASE_FEE_EUR,
+  DEFAULT_DELIVERY_PER_KM_EUR,
+  computeDeliveryFee,
   distanceFromStoreKm,
 } from '../../common/utils/delivery';
 import {
-  ORDER_STATUS_TRANSITIONS,
   CUSTOMER_CANCELLABLE_STATUSES,
   ADMIN_CANCELLABLE_STATUSES,
   DEFAULT_PREP_BUFFER_MINUTES,
+  transitionsFor,
 } from '../../shared/constants';
-import { OrderStatus } from '../../shared/types';
+import { OrderStatus, PickupMode } from '../../shared/types';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CustomerOrdersQueryDto, AdminOrdersQueryDto } from './dto/orders-query.dto';
 import { OrdersGateway } from './orders.gateway';
@@ -55,12 +56,21 @@ export class OrdersService {
         );
       }
       const km = distanceFromStoreKm(dto.deliveryLat, dto.deliveryLng);
-      if (km > DELIVERY_MAX_KM) {
-        throw new BadRequestException(
-          `Adresse hors zone (~${km.toFixed(1)} km). Livraison max ${DELIVERY_MAX_KM} km.`,
-        );
-      }
-      deliveryFee = DELIVERY_FEE_EUR;
+
+      // Pricing is configured per shop. Read the live values so the admin
+      // panel can change them without a redeploy.
+      const { data: settings } = await this.supabase
+        .from('shop_settings')
+        .select('delivery_base_fee_eur, delivery_per_km_eur')
+        .eq('id', 1)
+        .maybeSingle();
+      const baseFee = settings?.delivery_base_fee_eur
+        ? Number(settings.delivery_base_fee_eur)
+        : DEFAULT_DELIVERY_BASE_FEE_EUR;
+      const perKm = settings?.delivery_per_km_eur
+        ? Number(settings.delivery_per_km_eur)
+        : DEFAULT_DELIVERY_PER_KM_EUR;
+      deliveryFee = computeDeliveryFee(km, baseFee, perKm);
       deliveryAddress = dto.deliveryAddress;
       deliveryLat = dto.deliveryLat;
       deliveryLng = dto.deliveryLng;
@@ -401,7 +411,8 @@ export class OrdersService {
 
   async advanceOrderStatus(orderId: string, newStatus: OrderStatus) {
     const order = await this.getOrderById(orderId);
-    const allowed = ORDER_STATUS_TRANSITIONS[order.status as OrderStatus];
+    const transitions = transitionsFor(order.pickup_mode as PickupMode | null);
+    const allowed = transitions[order.status as OrderStatus] ?? [];
 
     if (!allowed.includes(newStatus)) {
       throw new BadRequestException(
@@ -410,6 +421,27 @@ export class OrdersService {
     }
 
     return this.updateStatus(orderId, newStatus);
+  }
+
+  /**
+   * Customer self-confirms reception of the order. For pickup this is the
+   * moment the customer takes the bag at the counter; for delivery it is the
+   * moment the courier hands them the food.
+   */
+  async confirmCustomerPickedUp(userId: string, orderId: string) {
+    const order = await this.getCustomerOrderById(userId, orderId);
+    const transitions = transitionsFor(order.pickup_mode as PickupMode | null);
+    const allowed = transitions[order.status as OrderStatus] ?? [];
+
+    if (!allowed.includes('picked_up')) {
+      throw new BadRequestException(
+        order.pickup_mode === 'delivery'
+          ? 'La commande n\'est pas encore en main du livreur.'
+          : 'La commande n\'est pas encore prête.',
+      );
+    }
+
+    return this.updateStatus(orderId, 'picked_up');
   }
 
   async adminCancelOrder(orderId: string) {

@@ -4,6 +4,7 @@ export const ORDER_STATUS = {
   RECEIVED: "received",
   PREPARING: "preparing",
   READY: "ready",
+  HANDED_TO_LIVREUR: "handed_to_livreur",
   PICKED_UP: "picked_up",
   CANCELLED: "cancelled",
 } as const satisfies Record<string, OrderStatus>;
@@ -13,6 +14,7 @@ export const ACTIVE_ORDER_STATUSES: readonly OrderStatus[] = [
   ORDER_STATUS.RECEIVED,
   ORDER_STATUS.PREPARING,
   ORDER_STATUS.READY,
+  ORDER_STATUS.HANDED_TO_LIVREUR,
 ];
 
 /** Statuses with no further transitions. */

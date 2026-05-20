@@ -48,6 +48,7 @@ export type OrderStatus =
   | "received"
   | "preparing"
   | "ready"
+  | "handed_to_livreur"
   | "picked_up"
   | "cancelled";
 
