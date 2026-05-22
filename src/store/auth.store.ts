@@ -31,7 +31,7 @@ type AuthState = {
   setAccessToken: (token: string | null) => void;
   completeOnboarding: () => void;
   setAuthChoice: (choice: AuthChoice) => void;
-  /** `phone` MUST be E.164 (e.g. `+33612345678` or `+213512345678`). */
+  /** `phone` MUST be E.164 (e.g. `+33612345678`). */
   sendOtp: (phone: string) => Promise<{ error?: string }>;
   /** `phone` MUST be E.164. */
   verifyOtp: (phone: string, code: string) => Promise<{ error?: string; isNewUser?: boolean }>;

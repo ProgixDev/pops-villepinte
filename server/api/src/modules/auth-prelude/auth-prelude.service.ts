@@ -14,7 +14,7 @@ import {
   SUPABASE_ADMIN,
   SUPABASE_ANON,
 } from '../../common/supabase/supabase.module';
-import { normalizeMobile } from '../../common/utils/phone';
+import { normalizeFrenchMobile } from '../../common/utils/phone';
 import type { Env } from '../../config/env.validation';
 
 type PreludeError = {
@@ -95,7 +95,7 @@ export class AuthPreludeService implements OnModuleInit {
   }
 
   private requireMobile(rawPhone: string): string {
-    const phone = normalizeMobile(rawPhone);
+    const phone = normalizeFrenchMobile(rawPhone);
     if (!phone) throw new BadRequestException('Invalid phone format');
     return phone;
   }

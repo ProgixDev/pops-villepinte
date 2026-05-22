@@ -15,12 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FoodPattern from "@/components/common/FoodPattern";
 import { colors } from "@/constants/theme";
 import { useDeferredMount } from "@/hooks/useDeferredMount";
-import {
-  buildE164,
-  DIAL_PREFIXES,
-  formatFrenchMobile,
-  type DialPrefix,
-} from "@/lib/phone";
+import { formatFrenchMobile, normalizeFrenchMobile } from "@/lib/phone";
 import { useAuthStore } from "@/store/auth.store";
 import { useProfileStore } from "@/store/profile.store";
 
@@ -56,7 +51,6 @@ export default function AuthFlow({
 
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
-  const [prefixIdx, setPrefixIdx] = useState(0);
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill("") as string[]);
   const [phoneError, setPhoneError] = useState<string | undefined>();
   const [otpError, setOtpError] = useState<string | undefined>();
@@ -74,16 +68,6 @@ export default function AuthFlow({
     return () => clearInterval(id);
   }, [resendCooldown]);
 
-  const prefix: DialPrefix = DIAL_PREFIXES[prefixIdx] ?? DIAL_PREFIXES[0]!;
-  const isFrench = prefix.display === "+33";
-
-  const cyclePrefix = (): void => {
-    void Haptics.selectionAsync();
-    setPrefixIdx((i) => (i + 1) % DIAL_PREFIXES.length);
-    setPhone("");
-    setPhoneError(undefined);
-  };
-
   // Single ref holding an array of TextInput refs. Avoids the rules-of-hooks
   // violation of calling useRef() inside a .map/Array.from loop.
   const otpRefs = useRef<Array<TextInput | null>>(
@@ -94,25 +78,14 @@ export default function AuthFlow({
   };
 
   const handlePhoneChange = (v: string): void => {
-    // French gets the familiar "06 12 34 56 78" formatter; other prefixes
-    // accept raw digits (up to 10) with no auto-grouping.
-    if (isFrench) {
-      setPhone(formatFrenchMobile(v));
-    } else {
-      const digits = v.replace(/\D/g, "").slice(0, prefix.maxLocalDigits);
-      setPhone(digits);
-    }
+    setPhone(formatFrenchMobile(v));
     setPhoneError(undefined);
   };
 
   const handleSendCode = async (): Promise<void> => {
-    const e164 = buildE164(prefix, phone);
+    const e164 = normalizeFrenchMobile(phone);
     if (!e164) {
-      setPhoneError(
-        isFrench
-          ? "Numéro invalide. Utilise un 06 ou 07."
-          : "Numéro invalide. Doit commencer par 5, 6 ou 7.",
-      );
+      setPhoneError("Numéro invalide. Utilise un 06 ou 07.");
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -132,7 +105,7 @@ export default function AuthFlow({
 
   const handleResendCode = async (): Promise<void> => {
     if (resendCooldown > 0 || resending) return;
-    const e164 = buildE164(prefix, phone);
+    const e164 = normalizeFrenchMobile(phone);
     if (!e164) {
       setOtpError("Numéro invalide.");
       return;
@@ -167,7 +140,7 @@ export default function AuthFlow({
 
     if (index === OTP_LENGTH - 1 && digit !== "") {
       const code = next.join("");
-      const e164 = buildE164(prefix, phone);
+      const e164 = normalizeFrenchMobile(phone);
       if (!e164) {
         setOtpError("Numéro invalide.");
         return;
@@ -245,7 +218,7 @@ export default function AuthFlow({
             marginTop: 8,
           }}
         >
-          Code envoyé au {prefix.display} {phone}
+          Code envoyé au +33 {phone}
         </Text>
 
         <View
@@ -432,11 +405,7 @@ export default function AuthFlow({
             gap: 12,
           }}
         >
-          <Pressable
-            onPress={cyclePrefix}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Changer l'indicatif pays"
+          <View
             style={{
               paddingHorizontal: 10,
               paddingVertical: 6,
@@ -452,16 +421,16 @@ export default function AuthFlow({
                 color: colors.primary,
               }}
             >
-              {prefix.display}
+              +33
             </Text>
-          </Pressable>
+          </View>
           <TextInput
             value={phone}
             onChangeText={handlePhoneChange}
-            placeholder={isFrench ? "06 12 34 56 78" : "5 12 34 56 78"}
+            placeholder="06 12 34 56 78"
             placeholderTextColor="rgba(255,206,0,0.35)"
             keyboardType="phone-pad"
-            maxLength={isFrench ? 14 : prefix.maxLocalDigits}
+            maxLength={14}
             autoFocus
             style={{
               flex: 1,
