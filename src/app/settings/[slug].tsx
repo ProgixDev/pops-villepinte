@@ -13,7 +13,7 @@ import {
   Phone,
 } from "lucide-react-native";
 
-import ProductCard from "@/components/menu/ProductCard";
+import ProductRow from "@/components/menu/ProductRow";
 import { useFavoritesStore } from "@/store/favorites.store";
 import { useMenuStore } from "@/store/menu.store";
 import type { Product } from "@/types";
@@ -83,20 +83,9 @@ function FavorisContent(): React.ReactElement {
   }
 
   return (
-    <View
-      style={{
-        paddingTop: 16,
-        paddingHorizontal: 16,
-        flexDirection: "row",
-        flexWrap: "wrap",
-        justifyContent: "space-between",
-        rowGap: 16,
-      }}
-    >
-      {favoriteProducts.map((product) => (
-        <View key={product.id} style={{ width: "48%" }}>
-          <ProductCard product={product} size="sm" />
-        </View>
+    <View style={{ paddingTop: 8 }}>
+      {favoriteProducts.map((product, idx) => (
+        <ProductRow key={product.id} product={product} index={idx} />
       ))}
     </View>
   );
