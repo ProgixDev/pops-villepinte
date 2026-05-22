@@ -6,8 +6,6 @@ import { supabase } from "@/lib/supabase";
 
 import { asyncStorageAdapter } from "./_storage";
 
-const DEV_AUTH = process.env.EXPO_PUBLIC_DEV_AUTH === "true";
-const DEV_OTP_CODE = "000000";
 const API_BASE =
   process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
 
@@ -83,12 +81,6 @@ export const useAuthStore = create<AuthState>()(
           return { error: "Numéro invalide." };
         }
 
-        // Dev bypass: skip Prelude entirely, accept the constant code on verify.
-        if (DEV_AUTH) {
-          set({ loading: false, phone });
-          return {};
-        }
-
         const { error } = await postApi("/auth/send-code", { phone });
         set({ loading: false });
         return error ? { error } : {};
@@ -102,16 +94,10 @@ export const useAuthStore = create<AuthState>()(
           return { error: "Numéro invalide." };
         }
 
-        const endpoint = DEV_AUTH ? "/auth/dev-signin" : "/auth/verify-code";
-        if (DEV_AUTH && code !== DEV_OTP_CODE) {
-          set({ loading: false });
-          return { error: `Code invalide (utilise ${DEV_OTP_CODE} en dev)` };
-        }
-
-        const { data, error } = await postApi<SessionPayload>(endpoint, {
-          phone,
-          code,
-        });
+        const { data, error } = await postApi<SessionPayload>(
+          "/auth/verify-code",
+          { phone, code },
+        );
         if (error || !data) {
           set({ loading: false });
           return { error: error ?? "Sign-in failed" };

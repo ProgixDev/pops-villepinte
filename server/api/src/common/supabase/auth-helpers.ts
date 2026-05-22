@@ -12,9 +12,8 @@ export type PhoneSessionResponse = {
 
 /**
  * Provision a Supabase auth user by phone (creating it if missing), reset its
- * password to a fresh random value, and return a signed-in session. Used by
- * any auth flow that has externally verified a phone number (Prelude in prod,
- * the dev OTP bypass in dev).
+ * password to a fresh random value, and return a signed-in session. Called by
+ * the Prelude verification flow once the phone number has been confirmed.
  *
  * Lookup is O(1) via the indexed `public.profiles.phone` column; if a profile
  * row is missing we fall back to creating a fresh auth user. The
@@ -90,13 +89,20 @@ async function findAuthUserByPhone(
   // Fallback: an auth user can exist without a profile row if handle_new_user
   // ever failed. Without this check we'd try to createUser() and Supabase
   // would 409 with "Phone number already registered by another user".
+  // PostgREST only exposes `public`/`graphql_public` by default, so a hosted
+  // project without the auth schema added to "Exposed schemas" returns
+  // PGRST106 here. Treat that as "no orphan" so first-time sign-in still
+  // works; on conflict the createUser call surfaces the real error.
   const { data: orphan, error: orphanErr } = await admin
     .schema('auth')
     .from('users')
     .select('id')
     .eq('phone', phoneNoPlus)
     .maybeSingle();
-  if (orphanErr) throw orphanErr;
+  if (orphanErr) {
+    if ((orphanErr as { code?: string }).code === 'PGRST106') return null;
+    throw orphanErr;
+  }
   if (!orphan) return null;
 
   await admin

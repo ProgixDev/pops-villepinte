@@ -15,7 +15,11 @@
       "Bash(curl -sL https://unpkg.com/@rnmapbox/maps@__TRACKED_VAR__/android/build.gradle)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(curl -s -m 3 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -m 3 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/api/v1/auth/dev-signin -X POST -H \"Content-Type: application/json\" -d '{\"phone\":\"+33600000000\",\"code\":\"000000\"}')",
+      "PowerShell($body = '{\"phone\":\"+33612345678\",\"code\":\"000000\"}'; $req = [System.Net.HttpWebRequest]::Create\\(\"http://127.0.0.1:3000/api/v1/auth/dev-signin\"\\); $req.Method = \"POST\"; $req.ContentType = \"application/json\"; $req.Timeout = 8000; $writer = New-Object System.IO.StreamWriter\\($req.GetRequestStream\\(\\)\\); $writer.Write\\($body\\); $writer.Close\\(\\); try { $resp = $req.GetResponse\\(\\); $r = New-Object System.IO.StreamReader\\($resp.GetResponseStream\\(\\)\\); \"OK $\\($resp.StatusCode.value__\\) - $\\($r.ReadToEnd\\(\\)\\)\" } catch [System.Net.WebException] { $resp = $_.Exception.Response; if \\($resp\\) { $r = New-Object System.IO.StreamReader\\($resp.GetResponseStream\\(\\)\\); $b = $r.ReadToEnd\\(\\); \"STATUS $\\($resp.StatusCode.value__\\) CT=$\\($resp.ContentType\\) LEN=$\\($resp.ContentLength\\)`nBODY: <<$b>>\" } else { \"NORESP: $\\($_.Exception.Message\\)\" } })",
+      "PowerShell($body = '{\"phone\":\"+33698765432\",\"code\":\"000000\"}'; $req = [System.Net.HttpWebRequest]::Create\\(\"http://127.0.0.1:3000/api/v1/auth/dev-signin\"\\); $req.Method = \"POST\"; $req.ContentType = \"application/json\"; $req.Timeout = 15000; $writer = New-Object System.IO.StreamWriter\\($req.GetRequestStream\\(\\)\\); $writer.Write\\($body\\); $writer.Close\\(\\); try { $resp = $req.GetResponse\\(\\); $r = New-Object System.IO.StreamReader\\($resp.GetResponseStream\\(\\)\\); \"OK $\\($resp.StatusCode.value__\\) LEN $\\($resp.ContentLength\\)`nBODY-SNIPPET: $\\($r.ReadToEnd\\(\\).Substring\\(0,[Math]::Min\\(300,500\\)\\)\\)\" } catch [System.Net.WebException] { $resp = $_.Exception.Response; if \\($resp\\) { $r = New-Object System.IO.StreamReader\\($resp.GetResponseStream\\(\\)\\); $b = $r.ReadToEnd\\(\\); \"STATUS $\\($resp.StatusCode.value__\\) CT=$\\($resp.ContentType\\) LEN=$\\($resp.ContentLength\\)`nBODY: <<$b>>\" } else { \"NORESP: $\\($_.Exception.Message\\)\" } })"
     ]
   },
   "enableAllProjectMcpServers": true,

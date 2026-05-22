@@ -15,7 +15,6 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SeedModule } from './modules/seed/seed.module';
-import { AuthDevModule } from './modules/auth-dev/auth-dev.module';
 import { AuthPreludeModule } from './modules/auth-prelude/auth-prelude.module';
 import { AccompagnementsModule } from './modules/accompagnements/accompagnements.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -36,7 +35,6 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     AdminModule,
     AnalyticsModule,
     SeedModule,
-    AuthDevModule,
     AuthPreludeModule,
     AccompagnementsModule,
     NotificationsModule,

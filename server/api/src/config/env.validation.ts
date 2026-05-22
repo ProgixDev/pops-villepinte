@@ -16,14 +16,8 @@ const envSchema = z.object({
   PRODUCT_IMAGES_BUCKET: z.string().default('product-images'),
 
   // Prelude (https://prelude.so) — SMS OTP delivery + verification.
-  // Required in production; optional in development if DEV_AUTH_ENABLED=true.
-  PRELUDE_API_TOKEN: z.string().min(20).optional(),
+  PRELUDE_API_TOKEN: z.string().min(20),
   PRELUDE_API_BASE: z.string().url().default('https://api.prelude.dev/v2'),
-
-  DEV_AUTH_ENABLED: z
-    .union([z.boolean(), z.string()])
-    .transform((v) => v === true || v === 'true' || v === '1')
-    .default(false),
 
   // Bootstrap-only credentials read by `seed:admin` to provision the super-admin
   // in Supabase Auth. After provisioning, Supabase owns the password.
