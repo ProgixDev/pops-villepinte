@@ -172,24 +172,22 @@ export default function OnboardingFlow({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.primary, overflow: "hidden" }}>
-      {/* Warning tapes — top area on slides 1&2, bottom area on slide 3 */}
-      {currentIndex <= 1 ? (
-        <>
-          <WarningTape top={140} rotate="-6deg" index={0} direction="left" />
-          <WarningTape top={190} rotate="-6deg" index={1} direction="right" />
-          <WarningTape top={240} rotate="-6deg" index={2} direction="left" />
-          <WarningTape top={290} rotate="-6deg" index={3} direction="right" />
-          <WarningTape top={340} rotate="-6deg" index={4} direction="left" />
-        </>
-      ) : (
-        <>
-          <WarningTape top={440} rotate="-6deg" index={0} direction="left" />
-          <WarningTape top={490} rotate="-6deg" index={1} direction="right" />
-          <WarningTape top={540} rotate="-6deg" index={2} direction="left" />
-          <WarningTape top={590} rotate="-6deg" index={3} direction="right" />
-          <WarningTape top={640} rotate="-6deg" index={4} direction="left" />
-        </>
-      )}
+      {/* Warning tapes — top area on slides 1&2, bottom area on slide 3. The
+          5 instances stay mounted across slide transitions (stable keys) so
+          we don't remount + re-allocate shared values every time currentIndex
+          crosses 1↔2. Only the `top` prop changes. */}
+      {[0, 1, 2, 3, 4].map((i) => {
+        const baseTop = currentIndex <= 1 ? 140 : 440;
+        return (
+          <WarningTape
+            key={i}
+            top={baseTop + i * 50}
+            rotate="-6deg"
+            index={i}
+            direction={i % 2 === 0 ? "left" : "right"}
+          />
+        );
+      })}
 
       {currentIndex === 0 ? (
         <View
@@ -207,6 +205,8 @@ export default function OnboardingFlow({
           <Image
             source={burgerImage}
             contentFit="contain"
+            cachePolicy="memory-disk"
+            recyclingKey="onboarding-burger"
             style={{ width: "100%", height: "100%" }}
           />
         </View>
@@ -228,7 +228,9 @@ export default function OnboardingFlow({
           <Image
             source={tendersImage}
             contentFit="contain"
-            style={{ width: 700, height: 700 }}
+            cachePolicy="memory-disk"
+            recyclingKey="onboarding-tenders"
+            style={{ width: 480, height: 480 }}
           />
         </View>
       ) : null}
@@ -249,6 +251,8 @@ export default function OnboardingFlow({
           <Image
             source={tacosImage}
             contentFit="contain"
+            cachePolicy="memory-disk"
+            recyclingKey="onboarding-tacos"
             style={{ width: 500, height: 500 }}
           />
         </View>

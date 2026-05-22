@@ -15,6 +15,7 @@ import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 import AnimatedSplash from "@/components/splash/AnimatedSplash";
 import { useAppFonts } from "@/constants/fonts";
 import { ROUTES } from "@/constants/routes";
+import { preloadFlowImages } from "@/lib/preloadImages";
 import { registerForPushAsync } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 import type { NotificationData } from "@/lib/api";
@@ -50,10 +51,13 @@ export default function RootLayout(): React.ReactNode {
     }
   }, [fontsLoaded]);
 
-  // Restore session and fetch menu on app start
+  // Restore session and fetch menu on app start. Also kick off image
+  // preloading so the onboarding/auth flow doesn't decode 7 large PNGs
+  // simultaneously during a screen transition (OOM risk on low-end Android).
   useEffect(() => {
     void restoreSession();
     void fetchMenu();
+    void preloadFlowImages();
   }, []);
 
   // Fetch profile when user becomes authed

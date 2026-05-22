@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { normalizeFrenchMobile } from "@/lib/phone";
 import { supabase } from "@/lib/supabase";
 
 import { asyncStorageAdapter } from "./_storage";
@@ -20,7 +19,9 @@ type AuthState = {
   loading: boolean;
   completeOnboarding: () => void;
   setAuthChoice: (choice: AuthChoice) => void;
+  /** `phone` MUST be E.164 (e.g. `+33612345678` or `+213512345678`). */
   sendOtp: (phone: string) => Promise<{ error?: string }>;
+  /** `phone` MUST be E.164. */
   verifyOtp: (phone: string, code: string) => Promise<{ error?: string; isNewUser?: boolean }>;
   completeSignup: () => void;
   logout: () => Promise<void>;
@@ -73,10 +74,9 @@ export const useAuthStore = create<AuthState>()(
         set({ authChoice: choice });
       },
 
-      sendOtp: async (rawPhone: string) => {
+      sendOtp: async (phone: string) => {
         set({ loading: true });
-        const phone = normalizeFrenchMobile(rawPhone);
-        if (!phone) {
+        if (!phone.startsWith("+")) {
           set({ loading: false });
           return { error: "Numéro invalide." };
         }
@@ -86,10 +86,9 @@ export const useAuthStore = create<AuthState>()(
         return error ? { error } : {};
       },
 
-      verifyOtp: async (rawPhone: string, code: string) => {
+      verifyOtp: async (phone: string, code: string) => {
         set({ loading: true });
-        const phone = normalizeFrenchMobile(rawPhone);
-        if (!phone) {
+        if (!phone.startsWith("+")) {
           set({ loading: false });
           return { error: "Numéro invalide." };
         }

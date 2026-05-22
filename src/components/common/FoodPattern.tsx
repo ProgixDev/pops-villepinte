@@ -77,6 +77,8 @@ function FoodPatternImpl({
             <Image
               source={src}
               contentFit="contain"
+              cachePolicy="memory-disk"
+              recyclingKey={`food-pattern-${idx % ICONS.length}`}
               style={{ width: iconSize, height: iconSize }}
             />
           </View>,

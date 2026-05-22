@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -15,7 +15,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FoodPattern from "@/components/common/FoodPattern";
 import { colors } from "@/constants/theme";
 import { useDeferredMount } from "@/hooks/useDeferredMount";
-import { formatFrenchMobile, PHONE_REGEX } from "@/lib/phone";
+import {
+  buildE164,
+  DIAL_PREFIXES,
+  formatFrenchMobile,
+  type DialPrefix,
+} from "@/lib/phone";
 import { useAuthStore } from "@/store/auth.store";
 import { useProfileStore } from "@/store/profile.store";
 
@@ -24,6 +29,7 @@ const logoImage = require("../../../assets/images/pops-logo.png") as number;
 
 const PATTERN_HEIGHT = Dimensions.get("window").height * 0.35;
 const OTP_LENGTH = 6;
+const RESEND_COOLDOWN_SECONDS = 30;
 
 export type AuthFlowProps = {
   onComplete: (phone: string) => void;
@@ -50,30 +56,69 @@ export default function AuthFlow({
 
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
+  const [prefixIdx, setPrefixIdx] = useState(0);
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill("") as string[]);
   const [phoneError, setPhoneError] = useState<string | undefined>();
   const [otpError, setOtpError] = useState<string | undefined>();
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resending, setResending] = useState(false);
 
-  const otpRefs = Array.from({ length: OTP_LENGTH }, () =>
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useRef<TextInput>(null),
+  // Tick the resend cooldown down to 0. Effect re-runs whenever the cooldown
+  // is restarted (after sendCode / resend); a single interval per cycle is
+  // fine since we always end at 0 and stop.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = setInterval(() => {
+      setResendCooldown((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [resendCooldown]);
+
+  const prefix: DialPrefix = DIAL_PREFIXES[prefixIdx] ?? DIAL_PREFIXES[0]!;
+  const isFrench = prefix.display === "+33";
+
+  const cyclePrefix = (): void => {
+    void Haptics.selectionAsync();
+    setPrefixIdx((i) => (i + 1) % DIAL_PREFIXES.length);
+    setPhone("");
+    setPhoneError(undefined);
+  };
+
+  // Single ref holding an array of TextInput refs. Avoids the rules-of-hooks
+  // violation of calling useRef() inside a .map/Array.from loop.
+  const otpRefs = useRef<Array<TextInput | null>>(
+    Array.from({ length: OTP_LENGTH }, () => null),
   );
+  const setOtpRef = (i: number) => (node: TextInput | null): void => {
+    otpRefs.current[i] = node;
+  };
 
   const handlePhoneChange = (v: string): void => {
-    setPhone(formatFrenchMobile(v));
+    // French gets the familiar "06 12 34 56 78" formatter; other prefixes
+    // accept raw digits (up to 10) with no auto-grouping.
+    if (isFrench) {
+      setPhone(formatFrenchMobile(v));
+    } else {
+      const digits = v.replace(/\D/g, "").slice(0, prefix.maxLocalDigits);
+      setPhone(digits);
+    }
     setPhoneError(undefined);
   };
 
   const handleSendCode = async (): Promise<void> => {
-    const digits = phone.replace(/\s/g, "");
-    if (!PHONE_REGEX.test(digits)) {
-      setPhoneError("Numéro invalide. Utilise un 06 ou 07.");
+    const e164 = buildE164(prefix, phone);
+    if (!e164) {
+      setPhoneError(
+        isFrench
+          ? "Numéro invalide. Utilise un 06 ou 07."
+          : "Numéro invalide. Doit commencer par 5, 6 ou 7.",
+      );
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
     void Haptics.selectionAsync();
 
-    const result = await sendOtp(digits);
+    const result = await sendOtp(e164);
     if (result.error) {
       setPhoneError(result.error);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -81,7 +126,32 @@ export default function AuthFlow({
     }
 
     setStep("otp");
-    setTimeout(() => otpRefs[0].current?.focus(), 300);
+    setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    setTimeout(() => otpRefs.current[0]?.focus(), 300);
+  };
+
+  const handleResendCode = async (): Promise<void> => {
+    if (resendCooldown > 0 || resending) return;
+    const e164 = buildE164(prefix, phone);
+    if (!e164) {
+      setOtpError("Numéro invalide.");
+      return;
+    }
+    setResending(true);
+    setOtpError(undefined);
+    void Haptics.selectionAsync();
+
+    const result = await sendOtp(e164);
+    setResending(false);
+    if (result.error) {
+      setOtpError(result.error);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+
+    setOtp(Array(OTP_LENGTH).fill(""));
+    setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    setTimeout(() => otpRefs.current[0]?.focus(), 200);
   };
 
   const handleOtpDigit = async (digit: string, index: number): Promise<void> => {
@@ -92,30 +162,34 @@ export default function AuthFlow({
     setOtpError(undefined);
 
     if (digit !== "" && index < OTP_LENGTH - 1) {
-      otpRefs[index + 1].current?.focus();
+      otpRefs.current[index + 1]?.focus();
     }
 
     if (index === OTP_LENGTH - 1 && digit !== "") {
       const code = next.join("");
-      const digits = phone.replace(/\s/g, "");
+      const e164 = buildE164(prefix, phone);
+      if (!e164) {
+        setOtpError("Numéro invalide.");
+        return;
+      }
 
-      const result = await verifyOtp(digits, code);
+      const result = await verifyOtp(e164, code);
       if (result.error) {
         setOtpError(result.error);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         setOtp(Array(OTP_LENGTH).fill(""));
-        setTimeout(() => otpRefs[0].current?.focus(), 200);
+        setTimeout(() => otpRefs.current[0]?.focus(), 200);
       } else {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setProfilePhone(digits);
-        onComplete(digits);
+        setProfilePhone(e164);
+        onComplete(e164);
       }
     }
   };
 
   const handleOtpBackspace = (index: number): void => {
     if (otp[index] === "" && index > 0) {
-      otpRefs[index - 1].current?.focus();
+      otpRefs.current[index - 1]?.focus();
       const next = [...otp];
       next[index - 1] = "";
       setOtp(next);
@@ -144,6 +218,8 @@ export default function AuthFlow({
           <Image
             source={logoImage}
             contentFit="contain"
+            cachePolicy="memory-disk"
+            recyclingKey="pops-logo"
             style={{ width: 60, height: 60 }}
           />
           <View style={{ width: 28 }} />
@@ -169,7 +245,7 @@ export default function AuthFlow({
             marginTop: 8,
           }}
         >
-          Code envoyé au {phone}
+          Code envoyé au {prefix.display} {phone}
         </Text>
 
         <View
@@ -182,7 +258,7 @@ export default function AuthFlow({
           {otp.map((digit, i) => (
             <TextInput
               key={i}
-              ref={otpRefs[i]}
+              ref={setOtpRef(i)}
               value={digit}
               onChangeText={(v) => void handleOtpDigit(v, i)}
               onKeyPress={({ nativeEvent }) => {
@@ -233,6 +309,44 @@ export default function AuthFlow({
             Code à 6 chiffres envoyé par SMS
           </Text>
         )}
+
+        {/* Resend OTP: countdown while cooling down, tappable once it hits 0. */}
+        <View style={{ marginTop: 24, alignItems: "center" }}>
+          {resendCooldown > 0 ? (
+            <Text
+              style={{
+                fontFamily: "Poppins_500Medium",
+                fontSize: 13,
+                color: "rgba(0,0,0,0.45)",
+              }}
+            >
+              Renvoyer le code dans {resendCooldown}s
+            </Text>
+          ) : (
+            <Pressable
+              onPress={() => void handleResendCode()}
+              disabled={resending}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Renvoyer le code"
+            >
+              {resending ? (
+                <ActivityIndicator size="small" color={colors.ink} />
+              ) : (
+                <Text
+                  style={{
+                    fontFamily: "Poppins_700Bold",
+                    fontSize: 14,
+                    color: colors.ink,
+                    textDecorationLine: "underline",
+                  }}
+                >
+                  Renvoyer le code
+                </Text>
+              )}
+            </Pressable>
+          )}
+        </View>
       </View>
     );
   }
@@ -246,12 +360,15 @@ export default function AuthFlow({
         overflow: "hidden",
       }}
     >
-      {/* Header with back arrow */}
+      {/* Header: back arrow + centered logo */}
       <View
         style={{
           paddingHorizontal: 32,
           paddingTop: insets.top + 16,
           zIndex: 15,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
         <Pressable
@@ -261,6 +378,14 @@ export default function AuthFlow({
         >
           <ArrowLeft size={28} color={colors.ink} strokeWidth={2.5} />
         </Pressable>
+        <Image
+          source={logoImage}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+          recyclingKey="pops-logo"
+          style={{ width: 80, height: 80 }}
+        />
+        <View style={{ width: 28 }} />
       </View>
 
       {/* Form content */}
@@ -307,7 +432,11 @@ export default function AuthFlow({
             gap: 12,
           }}
         >
-          <View
+          <Pressable
+            onPress={cyclePrefix}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Changer l'indicatif pays"
             style={{
               paddingHorizontal: 10,
               paddingVertical: 6,
@@ -323,16 +452,16 @@ export default function AuthFlow({
                 color: colors.primary,
               }}
             >
-              +33
+              {prefix.display}
             </Text>
-          </View>
+          </Pressable>
           <TextInput
             value={phone}
             onChangeText={handlePhoneChange}
-            placeholder="06 12 34 56 78"
+            placeholder={isFrench ? "06 12 34 56 78" : "5 12 34 56 78"}
             placeholderTextColor="rgba(255,206,0,0.35)"
             keyboardType="phone-pad"
-            maxLength={14}
+            maxLength={isFrench ? 14 : prefix.maxLocalDigits}
             autoFocus
             style={{
               flex: 1,
@@ -395,24 +524,6 @@ export default function AuthFlow({
         {patternReady ? <FoodPattern height={PATTERN_HEIGHT} /> : null}
       </View>
 
-      {/* Logo centered at very bottom */}
-      <View
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          alignItems: "center",
-          paddingBottom: 0,
-          zIndex: 15,
-        }}
-      >
-        <Image
-          source={logoImage}
-          contentFit="contain"
-          style={{ width: 80, height: 80 }}
-        />
-      </View>
     </View>
   );
 }

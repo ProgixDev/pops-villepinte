@@ -45,6 +45,8 @@ export default function AuthIndex(): React.ReactElement {
         <Image
           source={logoImage}
           contentFit="contain"
+          cachePolicy="memory-disk"
+          recyclingKey="pops-logo"
           style={{ width: 100, height: 100 }}
         />
       </View>
