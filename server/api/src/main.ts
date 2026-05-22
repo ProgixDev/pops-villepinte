@@ -28,38 +28,11 @@ async function bootstrap() {
 
   await app.register(helmet, { contentSecurityPolicy: false });
 
-  // CORS_ORIGINS is either `*` (reflect any origin) or a comma-separated
-  // allow-list. We accept exact strings AND simple `*` glob patterns
-  // (`https://*.vercel.app`) so Vercel preview URLs don't need a fresh env
-  // var per branch — important for the admin (pops-superadmin.vercel.app)
-  // which uses preview deploys.
-  const corsRaw = cfg.get('CORS_ORIGINS', { infer: true });
-  const corsOrigins =
-    corsRaw === '*'
-      ? true
-      : corsRaw
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .map((entry) =>
-            entry.includes('*')
-              ? new RegExp(
-                  '^' +
-                    entry
-                      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-                      .replace(/\*/g, '.*') +
-                    '$',
-                )
-              : entry,
-          );
-  Logger.log(
-    `CORS allow-list: ${corsOrigins === true ? '* (reflect)' : JSON.stringify(corsRaw)}`,
-    'Bootstrap',
-  );
-  await app.register(cors, {
-    origin: corsOrigins,
-    credentials: true,
-  });
+  // CORS is open: any origin, with credentials. `origin: true` reflects the
+  // request's Origin header back, which is required when `credentials: true`
+  // is set (the spec forbids combining `Access-Control-Allow-Origin: *` with
+  // credentialed requests).
+  await app.register(cors, { origin: true, credentials: true });
   await app.register(rateLimit, {
     max: cfg.get('RATE_LIMIT_MAX', { infer: true }) as number,
     timeWindow: '1 minute',

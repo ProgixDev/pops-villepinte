@@ -9,7 +9,6 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   SUPABASE_JWT_SECRET: z.string().min(20),
 
-  CORS_ORIGINS: z.string().default('*'),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   OTP_RATE_PER_HOUR: z.coerce.number().int().positive().default(5),
 
