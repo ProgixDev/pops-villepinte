@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { supabase } from "@/lib/supabase";
 
+import { useFavoritesStore } from "./favorites.store";
 import { asyncStorageAdapter } from "./_storage";
 
 const API_BASE =
@@ -129,6 +130,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         await supabase.auth.signOut();
+        useFavoritesStore.getState().clear();
         set({ authed: false, signupDone: false, phone: "", authChoice: null });
       },
 

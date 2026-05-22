@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +12,11 @@ import {
   MapPin,
   Phone,
 } from "lucide-react-native";
+
+import ProductCard from "@/components/menu/ProductCard";
+import { useFavoritesStore } from "@/store/favorites.store";
+import { useMenuStore } from "@/store/menu.store";
+import type { Product } from "@/types";
 
 const INK = "#111111";
 const MUTED = "#6B6B6B";
@@ -35,33 +40,64 @@ const TITLES: Record<SlugKey, string> = {
 
 /* ─────────────── FAVORIS ─────────────── */
 function FavorisContent(): React.ReactElement {
+  const favoriteIds = useFavoritesStore((s) => s.productIds);
+  const products = useMenuStore((s) => s.products);
+
+  const favoriteProducts = useMemo<Product[]>(() => {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    return favoriteIds
+      .map((id) => byId.get(id))
+      .filter((p): p is Product => p !== undefined);
+  }, [favoriteIds, products]);
+
+  if (favoriteProducts.length === 0) {
+    return (
+      <View style={{ alignItems: "center", paddingTop: 48 }}>
+        <Heart size={64} color={PRIMARY} strokeWidth={1.5} />
+        <Text
+          style={{
+            fontFamily: DISPLAY,
+            fontSize: 28,
+            color: INK,
+            marginTop: 24,
+            textAlign: "center",
+          }}
+        >
+          Tes plats préférés seront ici.
+        </Text>
+        <Text
+          style={{
+            fontFamily: BODY,
+            fontSize: 15,
+            color: MUTED,
+            marginTop: 12,
+            textAlign: "center",
+            lineHeight: 22,
+            paddingHorizontal: 20,
+          }}
+        >
+          Ajoute des favoris depuis le menu en tapant sur le c&#339;ur.
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={{ alignItems: "center", paddingTop: 48 }}>
-      <Heart size={64} color={PRIMARY} strokeWidth={1.5} />
-      <Text
-        style={{
-          fontFamily: DISPLAY,
-          fontSize: 28,
-          color: INK,
-          marginTop: 24,
-          textAlign: "center",
-        }}
-      >
-        Tes plats préférés seront ici.
-      </Text>
-      <Text
-        style={{
-          fontFamily: BODY,
-          fontSize: 15,
-          color: MUTED,
-          marginTop: 12,
-          textAlign: "center",
-          lineHeight: 22,
-          paddingHorizontal: 20,
-        }}
-      >
-        Ajoute des favoris depuis le menu en tapant sur le c&#339;ur.
-      </Text>
+    <View
+      style={{
+        paddingTop: 16,
+        paddingHorizontal: 16,
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "space-between",
+        rowGap: 16,
+      }}
+    >
+      {favoriteProducts.map((product) => (
+        <View key={product.id} style={{ width: "48%" }}>
+          <ProductCard product={product} size="sm" />
+        </View>
+      ))}
     </View>
   );
 }

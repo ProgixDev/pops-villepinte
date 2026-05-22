@@ -132,6 +132,14 @@ export const notificationsApi = {
     }),
 };
 
+export const favoritesApi = {
+  list: () => api<string[]>("/favorites"),
+  add: (productId: string) =>
+    api<{ ok: boolean }>(`/favorites/${productId}`, { method: "POST" }),
+  remove: (productId: string) =>
+    api<{ ok: boolean }>(`/favorites/${productId}`, { method: "DELETE" }),
+};
+
 export const ordersApi = {
   create: (data: CreateOrderPayload) =>
     api<OrderData>("/orders", { method: "POST", body: data }),

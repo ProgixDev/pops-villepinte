@@ -13,6 +13,7 @@ import { ROUTES } from "@/constants/routes";
 import { colors, shadow } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
+import { useFavoritesStore } from "@/store/favorites.store";
 import type { Product } from "@/types";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -55,14 +56,22 @@ export default function ProductCard({
 }: ProductCardProps): React.ReactElement {
   const router = useRouter();
   const addItem = useCartStore((s) => s.addItem);
+  const isFavorite = useFavoritesStore((s) =>
+    s.productIds.includes(product.id),
+  );
+  const toggleFavorite = useFavoritesStore((s) => s.toggle);
   const pressScale = useSharedValue(1);
   const addPressScale = useSharedValue(1);
+  const favPressScale = useSharedValue(1);
 
   const animatedCardStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pressScale.value }],
   }));
   const animatedAddStyle = useAnimatedStyle(() => ({
     transform: [{ scale: addPressScale.value }],
+  }));
+  const animatedFavStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: favPressScale.value }],
   }));
 
   const sizing = SIZING[size];
@@ -79,6 +88,11 @@ export default function ProductCard({
       quantity: 1,
       supplements: [],
     });
+  };
+
+  const handleToggleFavorite = (): void => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void toggleFavorite(product.id);
   };
 
   return (
@@ -133,23 +147,46 @@ export default function ProductCard({
           </View>
         ) : null}
 
-        <View
-          className="bg-surface-container-lowest items-center justify-center rounded-full"
-          style={{
-            position: "absolute",
-            top: 12,
-            right: 12,
-            width: 36,
-            height: 36,
-            shadowColor: colors.ink,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.08,
-            shadowRadius: 8,
-            elevation: 2,
+        <AnimatedPressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            isFavorite
+              ? `Retirer ${product.name} des favoris`
+              : `Ajouter ${product.name} aux favoris`
+          }
+          accessibilityState={{ selected: isFavorite }}
+          onPress={handleToggleFavorite}
+          onPressIn={() => {
+            favPressScale.value = withTiming(0.88, { duration: 120 });
           }}
+          onPressOut={() => {
+            favPressScale.value = withTiming(1, { duration: 160 });
+          }}
+          hitSlop={8}
+          className="bg-surface-container-lowest items-center justify-center rounded-full"
+          style={[
+            {
+              position: "absolute",
+              top: 12,
+              right: 12,
+              width: 36,
+              height: 36,
+              shadowColor: colors.ink,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.08,
+              shadowRadius: 8,
+              elevation: 2,
+            },
+            animatedFavStyle,
+          ]}
         >
-          <Heart size={16} color={colors.primary} strokeWidth={2} />
-        </View>
+          <Heart
+            size={16}
+            color={colors.primary}
+            strokeWidth={2}
+            fill={isFavorite ? colors.primary : "transparent"}
+          />
+        </AnimatedPressable>
       </View>
 
       {/* Body region — bottom 35% */}

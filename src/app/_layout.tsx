@@ -20,6 +20,7 @@ import { registerForPushAsync } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 import type { NotificationData } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
+import { useFavoritesStore } from "@/store/favorites.store";
 import { useMenuStore } from "@/store/menu.store";
 import { useNotificationsStore } from "@/store/notifications.store";
 import { useProfileStore } from "@/store/profile.store";
@@ -41,6 +42,7 @@ export default function RootLayout(): React.ReactNode {
   const fetchMenu = useMenuStore((s) => s.fetchMenu);
   const fetchProfile = useProfileStore((s) => s.fetchProfile);
   const fetchNotifications = useNotificationsStore((s) => s.fetch);
+  const fetchFavorites = useFavoritesStore((s) => s.fetch);
   const refreshUnread = useNotificationsStore((s) => s.refreshUnread);
   const prependNotification = useNotificationsStore((s) => s.prepend);
   const router = useRouter();
@@ -65,6 +67,7 @@ export default function RootLayout(): React.ReactNode {
     if (authed) {
       void fetchProfile();
       void fetchNotifications();
+      void fetchFavorites();
       void registerForPushAsync();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

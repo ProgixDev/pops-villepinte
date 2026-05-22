@@ -14,6 +14,7 @@ import VariantSelector from "@/components/menu/VariantSelector";
 import { colors, font, radius, shadow } from "@/constants/theme";
 import { formatPriceEUR } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
+import { useFavoritesStore } from "@/store/favorites.store";
 import { useMenuStore } from "@/store/menu.store";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -34,6 +35,10 @@ export default function ProductDetailScreen(): React.ReactElement {
   const supplements = useMenuStore((s) => s.supplements);
   const product = useMemo(() => getProductById(id), [id, getProductById]);
   const addItem = useCartStore((s) => s.addItem);
+  const isFavorite = useFavoritesStore((s) =>
+    id ? s.productIds.includes(id) : false,
+  );
+  const toggleFavorite = useFavoritesStore((s) => s.toggle);
 
   const [variantId, setVariantId] = useState<string | undefined>(
     product?.product_variants?.[0]?.id,
@@ -130,6 +135,17 @@ export default function ProductDetailScreen(): React.ReactElement {
             </Pressable>
             <View style={{ flexDirection: "row", gap: 10 }}>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isFavorite
+                    ? "Retirer des favoris"
+                    : "Ajouter aux favoris"
+                }
+                accessibilityState={{ selected: isFavorite }}
+                onPress={() => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  void toggleFavorite(product.id);
+                }}
                 style={{
                   width: 40,
                   height: 40,
@@ -140,7 +156,12 @@ export default function ProductDetailScreen(): React.ReactElement {
                   ...shadow.card,
                 }}
               >
-                <Heart size={20} color={colors.ink} strokeWidth={2} />
+                <Heart
+                  size={20}
+                  color={isFavorite ? colors.primary : colors.ink}
+                  strokeWidth={2}
+                  fill={isFavorite ? colors.primary : "transparent"}
+                />
               </Pressable>
               <Pressable
                 onPress={() => router.back()}
