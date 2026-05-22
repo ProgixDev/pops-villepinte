@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { getCurrentAccessToken, supabase } from "./supabase";
 
 const API_BASE =
   process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
@@ -22,6 +22,15 @@ class ApiError extends Error {
 }
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
+  // Prefer the in-memory mirror kept in sync via onAuthStateChange. It's
+  // populated synchronously by setSession()'s SIGNED_IN event, so requests
+  // fired right after signup get a bearer header even if
+  // supabase.auth.getSession()'s internal lock hasn't settled yet.
+  const mirrored = getCurrentAccessToken();
+  if (mirrored) {
+    return { Authorization: `Bearer ${mirrored}` };
+  }
+
   const {
     data: { session },
   } = await supabase.auth.getSession();

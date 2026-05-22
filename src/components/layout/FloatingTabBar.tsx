@@ -49,7 +49,7 @@ function GlassContainer({
 }): React.ReactElement {
   if (HAS_LIQUID_GLASS) {
     return (
-      <GlassView glassEffectStyle="regular" style={style}>
+      <GlassView glassEffectStyle="regular" colorScheme="light" style={style}>
         {children}
       </GlassView>
     );

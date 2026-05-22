@@ -18,6 +18,17 @@ type AuthState = {
   authChoice: AuthChoice;
   phone: string;
   loading: boolean;
+  /**
+   * Mirror of the current supabase access token. Kept in memory only (NOT
+   * persisted) so that on cold start we always restore from supabase's own
+   * storage and never ship an expired token to the API. The `api()` client
+   * reads this first, which avoids a class of production bugs where
+   * `supabase.auth.getSession()` returns null even though `setSession()` just
+   * succeeded — those manifested as "Missing bearer token" on the first
+   * fetches after signup.
+   */
+  accessToken: string | null;
+  setAccessToken: (token: string | null) => void;
   completeOnboarding: () => void;
   setAuthChoice: (choice: AuthChoice) => void;
   /** `phone` MUST be E.164 (e.g. `+33612345678` or `+213512345678`). */
@@ -66,6 +77,11 @@ export const useAuthStore = create<AuthState>()(
       authChoice: null,
       phone: "",
       loading: false,
+      accessToken: null,
+
+      setAccessToken: (token) => {
+        set({ accessToken: token });
+      },
 
       completeOnboarding: () => {
         set({ onboardingDone: true });
@@ -113,9 +129,15 @@ export const useAuthStore = create<AuthState>()(
           return { error: sessionErr.message };
         }
 
+        // Mirror the token immediately. supabase.auth.getSession() can return
+        // null in a brief window after setSession() in production builds, so
+        // the api client uses this mirror as the source of truth for the
+        // bearer header.
         const isNewUser = !sessionData.user?.user_metadata?.name;
         set({
           authed: true,
+          accessToken:
+            sessionData.session?.access_token ?? data.access_token,
           phone,
           signupDone: !isNewUser,
           authChoice: null,
@@ -131,20 +153,34 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         await supabase.auth.signOut();
         useFavoritesStore.getState().clear();
-        set({ authed: false, signupDone: false, phone: "", authChoice: null });
+        set({
+          authed: false,
+          signupDone: false,
+          phone: "",
+          authChoice: null,
+          accessToken: null,
+        });
       },
 
       restoreSession: async () => {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        if (!session) return;
+        if (!session) {
+          // Persisted `authed=true` is stale (supabase storage was cleared,
+          // token expired, etc). Downgrade so the UI doesn't keep firing
+          // token-less API calls — those produce the "Missing bearer token"
+          // server logs the user was seeing in production.
+          set({ authed: false, accessToken: null });
+          return;
+        }
         // Don't downgrade signupDone here: profiles.name (not user_metadata)
         // is the source of truth, and fetchProfile() resolves it. Promote
         // to true if metadata happens to have it; otherwise trust the
         // persisted value.
         set((state) => ({
           authed: true,
+          accessToken: session.access_token,
           phone: session.user.phone ?? "",
           signupDone:
             state.signupDone || !!session.user.user_metadata?.name,
