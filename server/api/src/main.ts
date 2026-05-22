@@ -27,10 +27,37 @@ async function bootstrap() {
   );
 
   await app.register(helmet, { contentSecurityPolicy: false });
-  await app.register(cors, {
-    origin: cfg.get('CORS_ORIGINS', { infer: true }) === '*'
+
+  // CORS_ORIGINS is either `*` (reflect any origin) or a comma-separated
+  // allow-list. We accept exact strings AND simple `*` glob patterns
+  // (`https://*.vercel.app`) so Vercel preview URLs don't need a fresh env
+  // var per branch — important for the admin (pops-superadmin.vercel.app)
+  // which uses preview deploys.
+  const corsRaw = cfg.get('CORS_ORIGINS', { infer: true });
+  const corsOrigins =
+    corsRaw === '*'
       ? true
-      : cfg.get('CORS_ORIGINS', { infer: true }).split(',').map((s) => s.trim()),
+      : corsRaw
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((entry) =>
+            entry.includes('*')
+              ? new RegExp(
+                  '^' +
+                    entry
+                      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+                      .replace(/\*/g, '.*') +
+                    '$',
+                )
+              : entry,
+          );
+  Logger.log(
+    `CORS allow-list: ${corsOrigins === true ? '* (reflect)' : JSON.stringify(corsRaw)}`,
+    'Bootstrap',
+  );
+  await app.register(cors, {
+    origin: corsOrigins,
     credentials: true,
   });
   await app.register(rateLimit, {
