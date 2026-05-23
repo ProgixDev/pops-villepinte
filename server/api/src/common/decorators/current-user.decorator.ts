@@ -4,13 +4,13 @@ export interface AuthUser {
   id: string;
   phone: string | null;
   email: string | null;
-  role: 'customer' | 'admin';
+  role: 'customer' | 'admin' | 'driver';
   profile: {
     id: string;
     name: string | null;
     phone: string | null;
     orderCount: number;
-    role: 'customer' | 'admin';
+    role: 'customer' | 'admin' | 'driver';
   };
 }
 

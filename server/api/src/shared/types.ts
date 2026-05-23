@@ -8,7 +8,7 @@ export type OrderStatus =
   | 'cancelled';
 
 export type PickupMode = 'pickup' | 'delivery';
-export type AppRole = 'customer' | 'admin';
+export type AppRole = 'customer' | 'admin' | 'driver';
 
 export interface Category {
   id: string;

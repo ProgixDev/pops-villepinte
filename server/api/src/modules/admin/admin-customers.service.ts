@@ -23,7 +23,10 @@ export class AdminCustomersService {
 
   async getCustomers(query: CustomersQueryDto) {
     const settings = await getLoyaltySettings(this.supabase);
-    let qb = this.supabase.from('profiles').select('*');
+    let qb = this.supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'customer');
 
     if (query.search) {
       qb = qb.or(
@@ -103,7 +106,8 @@ export class AdminCustomersService {
     const settings = await getLoyaltySettings(this.supabase);
     const { data: profiles } = await this.supabase
       .from('profiles')
-      .select('order_count');
+      .select('order_count')
+      .eq('role', 'customer');
     const distribution: Record<string, number> = {
       BIENVENUE: 0,
       HABITUE: 0,

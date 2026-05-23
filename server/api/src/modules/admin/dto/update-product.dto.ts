@@ -49,10 +49,6 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   is_available?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  is_active?: boolean;
 }
 
 export class ToggleAvailabilityDto {

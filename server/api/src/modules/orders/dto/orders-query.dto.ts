@@ -11,7 +11,14 @@ export class CustomerOrdersQueryDto extends PaginationDto {
 export class AdminOrdersQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
-  @IsIn(['received', 'preparing', 'ready', 'picked_up', 'cancelled'])
+  @IsIn([
+    'received',
+    'preparing',
+    'ready',
+    'handed_to_livreur',
+    'picked_up',
+    'cancelled',
+  ])
   status?: OrderStatus;
 
   @IsOptional()
