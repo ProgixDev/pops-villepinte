@@ -27,6 +27,15 @@ export function getCurrentAccessToken(): string | null {
   return currentAccessToken;
 }
 
+// Explicit setter for callers that just acquired a session (verifyOtp,
+// restoreSession). onAuthStateChange below also keeps it in sync, but in
+// release builds we've observed the SIGNED_IN event arriving *after* the React
+// effect that fires the post-login API calls — the explicit setter closes
+// that gap.
+export function setCurrentAccessToken(token: string | null): void {
+  currentAccessToken = token;
+}
+
 supabase.auth.onAuthStateChange((_event, session) => {
   currentAccessToken = session?.access_token ?? null;
 });

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { supabase } from "@/lib/supabase";
+import { setCurrentAccessToken, supabase } from "@/lib/supabase";
 
 import { useFavoritesStore } from "./favorites.store";
 import { asyncStorageAdapter } from "./_storage";
@@ -132,12 +132,19 @@ export const useAuthStore = create<AuthState>()(
         // Mirror the token immediately. supabase.auth.getSession() can return
         // null in a brief window after setSession() in production builds, so
         // the api client uses this mirror as the source of truth for the
-        // bearer header.
+        // bearer header. Push it into the supabase.ts module mirror BEFORE
+        // we flip `authed`, otherwise the React effect listening on `authed`
+        // can fire post-login API calls before the SIGNED_IN event reaches
+        // the mirror — that race is what produced the 401s on /profile,
+        // /favorites, /notifications and /profile/device-tokens immediately
+        // after sign-in on TestFlight.
+        const resolvedToken =
+          sessionData.session?.access_token ?? data.access_token;
+        setCurrentAccessToken(resolvedToken);
         const isNewUser = !sessionData.user?.user_metadata?.name;
         set({
           authed: true,
-          accessToken:
-            sessionData.session?.access_token ?? data.access_token,
+          accessToken: resolvedToken,
           phone,
           signupDone: !isNewUser,
           authChoice: null,
@@ -152,6 +159,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         await supabase.auth.signOut();
+        setCurrentAccessToken(null);
         useFavoritesStore.getState().clear();
         set({
           authed: false,
@@ -171,9 +179,14 @@ export const useAuthStore = create<AuthState>()(
           // token expired, etc). Downgrade so the UI doesn't keep firing
           // token-less API calls — those produce the "Missing bearer token"
           // server logs the user was seeing in production.
+          setCurrentAccessToken(null);
           set({ authed: false, accessToken: null });
           return;
         }
+        // Push the token into the supabase.ts mirror BEFORE flipping
+        // `authed`, otherwise the React effect that fans out post-auth API
+        // calls can race ahead of the SIGNED_IN broadcast.
+        setCurrentAccessToken(session.access_token);
         // Don't downgrade signupDone here: profiles.name (not user_metadata)
         // is the source of truth, and fetchProfile() resolves it. Promote
         // to true if metadata happens to have it; otherwise trust the

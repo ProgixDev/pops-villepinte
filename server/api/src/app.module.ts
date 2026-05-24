@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { configuration } from './config/configuration';
 import { validateEnv } from './config/env.validation';
@@ -28,7 +27,6 @@ import { DriversModule } from './modules/drivers/drivers.module';
       load: [configuration],
       validate: validateEnv,
     }),
-    JwtModule.register({ global: true }),
     SupabaseModule,
     HealthModule,
     MenuModule,

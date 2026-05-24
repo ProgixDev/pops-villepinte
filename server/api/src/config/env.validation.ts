@@ -7,7 +7,10 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(20),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
-  SUPABASE_JWT_SECRET: z.string().min(20),
+  // Legacy: auth tokens are now verified via supabase.auth.getUser(), which
+  // works regardless of whether the project signs with HS256 or asymmetric
+  // keys. Kept optional so existing deployments don't fail validation.
+  SUPABASE_JWT_SECRET: z.string().min(20).optional(),
 
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   OTP_RATE_PER_HOUR: z.coerce.number().int().positive().default(5),

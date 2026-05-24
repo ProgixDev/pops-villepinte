@@ -4,30 +4,20 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ADMIN } from '../supabase/supabase.module';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import type { Env } from '../../config/env.validation';
-
-interface SupabaseJwtPayload {
-  sub: string;
-  email?: string;
-  phone?: string;
-  role?: string;
-  exp: number;
-}
 
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
+  private readonly logger = new Logger(SupabaseAuthGuard.name);
+
   constructor(
     private readonly reflector: Reflector,
-    private readonly jwt: JwtService,
-    private readonly cfg: ConfigService<Env, true>,
     @Inject(SUPABASE_ADMIN) private readonly admin: SupabaseClient,
   ) {}
 
@@ -45,22 +35,33 @@ export class SupabaseAuthGuard implements CanActivate {
     }
     const token = header.slice('Bearer '.length).trim();
 
-    let payload: SupabaseJwtPayload;
-    try {
-      payload = await this.jwt.verifyAsync<SupabaseJwtPayload>(token, {
-        secret: this.cfg.get('SUPABASE_JWT_SECRET', { infer: true }),
-      });
-    } catch {
+    // Verify the token via Supabase itself rather than decoding it locally.
+    // Supabase validates the JWT regardless of whether the project signs with
+    // the legacy HS256 secret or the newer asymmetric (RS256/ES256) keys, so
+    // this avoids a class of production bugs where the deployment's
+    // SUPABASE_JWT_SECRET is wrong, empty, or out of sync with a project that
+    // has migrated to asymmetric JWT signing keys.
+    const { data: userRes, error: authErr } = await this.admin.auth.getUser(
+      token,
+    );
+    if (authErr || !userRes?.user) {
+      this.logger.warn(
+        `Token rejected by Supabase: ${authErr?.message ?? 'no user'}`,
+      );
       throw new UnauthorizedException('Invalid or expired token');
     }
+    const authUser = userRes.user;
 
     const { data, error } = await this.admin
       .from('profiles')
       .select('id, name, phone, order_count, role, is_blocked')
-      .eq('id', payload.sub)
+      .eq('id', authUser.id)
       .maybeSingle();
 
     if (error || !data) {
+      this.logger.warn(
+        `Profile lookup failed for ${authUser.id}: ${error?.message ?? 'not found'}`,
+      );
       throw new UnauthorizedException('Profile not found');
     }
 
@@ -69,9 +70,9 @@ export class SupabaseAuthGuard implements CanActivate {
     }
 
     req.user = {
-      id: payload.sub,
-      phone: payload.phone ?? data.phone ?? null,
-      email: payload.email ?? null,
+      id: authUser.id,
+      phone: authUser.phone ?? data.phone ?? null,
+      email: authUser.email ?? null,
       role: data.role,
       profile: {
         id: data.id,
