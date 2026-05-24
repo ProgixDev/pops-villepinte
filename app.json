@@ -78,8 +78,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "1c6303f4-85d3-4039-963d-9c3a93ce6778"
+        "projectId": "78ec6494-6b77-4cca-b9ef-31882f867f5f"
       }
-    }
+    },
+    "owner": "mohameddev7"
   }
 }
