@@ -13,6 +13,7 @@ import Animated, {
 import IconButton from "@/components/common/IconButton";
 import Toast from "@/components/common/Toast";
 import CountdownRing from "@/components/order/CountdownRing";
+import LiveDriverMap from "@/components/order/LiveDriverMap";
 import OrderStatusPill from "@/components/order/OrderStatusPill";
 import OrderTimeline from "@/components/order/OrderTimeline";
 import PickupInstructions from "@/components/order/PickupInstructions";
@@ -205,6 +206,20 @@ export default function OrderDetailScreen(): React.ReactElement {
             status={order.status}
           />
         </View>
+
+        {/* Live driver map — only while the assignment is "handed_to_livreur"
+            (driver picked up the food and is en route to the customer).
+            Earlier statuses are noise; later statuses revoke the RLS SELECT
+            anyway. */}
+        {isHandedToLivreur &&
+        order.activeDriverId &&
+        order.deliveryLat != null &&
+        order.deliveryLng != null ? (
+          <LiveDriverMap
+            driverId={order.activeDriverId}
+            dropoffCoords={[order.deliveryLng, order.deliveryLat]}
+          />
+        ) : null}
 
         {/* Timeline */}
         <OrderTimeline status={order.status} pickupMode={order.pickupMode} />

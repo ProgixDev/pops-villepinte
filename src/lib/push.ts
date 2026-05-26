@@ -3,7 +3,7 @@ import * as Device from "expo-device";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
-import { notificationsApi } from "./api";
+import { driverApi, notificationsApi } from "./api";
 
 // Foreground behaviour — show the banner while the app is open.
 Notifications.setNotificationHandler({
@@ -72,6 +72,65 @@ export async function registerForPushAsync(): Promise<string | null> {
       lastRegisteredToken = token;
     } catch {
       // Token will be retried on the next app launch.
+    }
+  }
+  return token;
+}
+
+let lastRegisteredDriverToken: string | null = null;
+
+/**
+ * Driver-flavored push registration. Same permission + Android channel + token
+ * acquisition as registerForPushAsync(), but writes to /driver/push-token
+ * instead of /profile/device-tokens. Drivers and customers can't both be
+ * signed in on the same install, so we keep the two registration paths
+ * separate (cleaner than a role-aware branch inside one function).
+ */
+export async function registerDriverPushAsync(): Promise<string | null> {
+  if (!Device.isDevice) return null;
+  if (Platform.OS === "web") return null;
+
+  const isGranted = (
+    p: Awaited<ReturnType<typeof Notifications.getPermissionsAsync>>,
+  ): boolean =>
+    (p as { granted?: boolean; status?: string }).granted === true ||
+    (p as { status?: string }).status === "granted";
+
+  let granted = isGranted(await Notifications.getPermissionsAsync());
+  if (!granted) {
+    granted = isGranted(await Notifications.requestPermissionsAsync());
+  }
+  if (!granted) return null;
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "Pop's Villepinte",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FFCE00",
+    });
+  }
+
+  const projectId =
+    (Constants.expoConfig?.extra?.eas?.projectId as string | undefined) ??
+    (Constants.easConfig?.projectId as string | undefined);
+
+  let token: string | null = null;
+  try {
+    const result = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
+    token = result.data;
+  } catch {
+    return null;
+  }
+
+  if (token && token !== lastRegisteredDriverToken) {
+    try {
+      await driverApi.registerPushToken(token);
+      lastRegisteredDriverToken = token;
+    } catch {
+      // Will be retried on the next app launch.
     }
   }
   return token;

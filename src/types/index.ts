@@ -66,6 +66,12 @@ export type Order = {
   deliveryLat?: number;
   deliveryLng?: number;
   deliveryFeeEUR?: number;
+  /**
+   * Driver id of the currently in-flight accepted assignment, if any.
+   * Server-populated only for the single-order endpoint (not the list).
+   * Drives the customer-side live tracking map.
+   */
+  activeDriverId?: string | null;
 };
 
 export type Profile = {

@@ -253,9 +253,13 @@ export class DriversService {
     if (!order) throw new NotFoundException('Commande introuvable');
 
     const driver = await this.getDriver(dto.driver_id);
-    if (!driver.is_active) {
+    // is_active is the driver-controlled online toggle. We let admin assign
+    // even when the driver is offline — the row gets created so the driver
+    // sees it next time they go online; only the push is suppressed below.
+    // is_blocked, on the other hand, is a hard ban: don't assign to those.
+    if (driver.is_blocked) {
       throw new BadRequestException(
-        'Ce livreur est inactif — réactive-le avant de lui confier une course.',
+        'Ce livreur est bloqué — débloque-le avant de lui confier une course.',
       );
     }
 
@@ -283,18 +287,23 @@ export class DriversService {
     if (error) throw error;
 
     // Best-effort push — never block the assignment on a notification hiccup.
-    void this.notifications
-      .notify(
-        { kind: 'user', userIds: [dto.driver_id] },
-        {
-          title: 'Nouvelle course 🛵',
-          body: `${order.customer_name} · ${Number(order.total_eur).toFixed(2)} €`,
-          notificationKind: 'order',
-          orderId: order.id,
-          data: { assignmentId: created.id, kind: 'driver-assignment' },
-        },
-      )
-      .catch(() => {});
+    // When the driver is offline (is_active=false) we deliberately skip the
+    // push: the assignment row still exists and they'll see it the moment
+    // they flip back online. This is the whole point of the online toggle.
+    if (driver.is_active) {
+      void this.notifications
+        .notify(
+          { kind: 'user', userIds: [dto.driver_id] },
+          {
+            title: 'Nouvelle course 🛵',
+            body: `${order.customer_name} · ${Number(order.total_eur).toFixed(2)} €`,
+            notificationKind: 'order',
+            orderId: order.id,
+            data: { assignmentId: created.id, kind: 'driver-assignment' },
+          },
+        )
+        .catch(() => {});
+    }
 
     return created;
   }

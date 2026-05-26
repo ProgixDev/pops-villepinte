@@ -38,6 +38,7 @@ function toOrder(data: OrderData): Order {
     deliveryLat: data.delivery_lat ?? undefined,
     deliveryLng: data.delivery_lng ?? undefined,
     deliveryFeeEUR: data.delivery_fee_eur,
+    activeDriverId: data.active_driver_id ?? null,
   };
 }
 

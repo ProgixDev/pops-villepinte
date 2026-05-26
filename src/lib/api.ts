@@ -161,6 +161,109 @@ export const ordersApi = {
     api<OrderData>(`/orders/${id}/picked-up`, { method: "PATCH" }),
 };
 
+// ─── Driver API ──────────────────────────────────────────────────────
+// All routes are gated server-side by DriverGuard (profiles.role==='driver').
+// A non-driver bearer token returns 403, which is exactly what we want for
+// defense in depth on top of the client-side role gate.
+
+export type DriverAssignmentStatus =
+  | "pending"
+  | "accepted"
+  | "refused"
+  | "cancelled";
+
+export type DriverAssignmentOrder = {
+  id: string;
+  total_eur: number;
+  delivery_fee_eur: number;
+  status: string;
+  pickup_mode: "pickup" | "delivery" | null;
+  customer_name: string;
+  customer_phone: string | null;
+  delivery_address: string | null;
+  delivery_lat: number | null;
+  delivery_lng: number | null;
+  created_at: string;
+  estimated_ready_at: string | null;
+};
+
+export type DriverAssignment = {
+  id: string;
+  order_id: string;
+  driver_id: string;
+  status: DriverAssignmentStatus;
+  note: string | null;
+  assigned_by: string | null;
+  assigned_at: string;
+  responded_at: string | null;
+  picked_up_at: string | null;
+  delivered_at: string | null;
+  orders: DriverAssignmentOrder | null;
+};
+
+export type DriverProfile = {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  role: "driver";
+  is_blocked: boolean;
+  is_active: boolean;
+  vehicle: "scooter" | "bike" | "car" | null;
+  license_plate: string | null;
+  expo_push_token: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DriverEarnings = {
+  period: "today" | "week" | "month";
+  since: string;
+  deliveries: number;
+  delivery_fees_eur: number;
+  gross_eur: number;
+};
+
+export const driverApi = {
+  me: () => api<DriverProfile>("/driver/me"),
+  setOnline: (is_active: boolean) =>
+    api<{ id: string; is_active: boolean }>("/driver/me/online", {
+      method: "PATCH",
+      body: { is_active },
+    }),
+  registerPushToken: (expo_push_token: string) =>
+    api<{ id: string; expo_push_token: string }>("/driver/push-token", {
+      method: "POST",
+      body: { expo_push_token },
+    }),
+  listAssignments: (status?: DriverAssignmentStatus) =>
+    api<DriverAssignment[]>("/driver/assignments", {
+      params: status ? { status } : undefined,
+    }),
+  getAssignment: (id: string) =>
+    api<DriverAssignment>(`/driver/assignments/${id}`),
+  respond: (
+    id: string,
+    status: "accepted" | "refused",
+    note?: string,
+  ) =>
+    api<DriverAssignment>(`/driver/assignments/${id}/respond`, {
+      method: "PATCH",
+      body: { status, note: note?.trim() || undefined },
+    }),
+  pickedUp: (id: string) =>
+    api<DriverAssignment>(`/driver/assignments/${id}/picked-up`, {
+      method: "PATCH",
+    }),
+  delivered: (id: string) =>
+    api<DriverAssignment>(`/driver/assignments/${id}/delivered`, {
+      method: "PATCH",
+    }),
+  earnings: (period?: "today" | "week" | "month") =>
+    api<DriverEarnings>("/driver/earnings", {
+      params: period ? { period } : undefined,
+    }),
+};
+
 // ─── API Types ───────────────────────────────────────────────────────
 
 export type Category = {
@@ -275,4 +378,6 @@ export type OrderData = {
   delivery_lat?: number | null;
   delivery_lng?: number | null;
   delivery_fee_eur?: number;
+  /** Only populated on /orders/:id (not the list); null when not assigned. */
+  active_driver_id?: string | null;
 };

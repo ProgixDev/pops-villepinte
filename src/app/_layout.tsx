@@ -1,7 +1,7 @@
 import "../../global.css";
 
 import { useEffect, useState } from "react";
-import { Stack, useRouter } from "expo-router";
+import { Redirect, Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -10,13 +10,14 @@ import { StatusBar } from "expo-status-bar";
 
 import AuthFlow from "@/components/auth/AuthFlow";
 import AuthIndex from "@/components/auth/AuthIndex";
+import DriverAuthFlow from "@/components/auth/DriverAuthFlow";
 import SignupForm from "@/components/auth/SignupForm";
 import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 import AnimatedSplash from "@/components/splash/AnimatedSplash";
 import { useAppFonts } from "@/constants/fonts";
 import { ROUTES } from "@/constants/routes";
 import { preloadFlowImages } from "@/lib/preloadImages";
-import { registerForPushAsync } from "@/lib/push";
+import { registerDriverPushAsync, registerForPushAsync } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 import type { NotificationData } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
@@ -29,13 +30,28 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout(): React.ReactNode {
   const fontsLoaded = useAppFonts();
-  const [splashDone, setSplashDone] = useState(false);
+  // Splash dismisses only when ALL conditions hold:
+  //   1. The animated splash component has finished its animation.
+  //   2. Zustand persist has finished hydrating from AsyncStorage.
+  //   3. restoreSession() has resolved (sessionRestored === true).
+  // The hydration gate is non-obvious but critical: AsyncStorage hydration is
+  // async, and if it lands AFTER restoreSession's set(), it overwrites our
+  // freshly-fetched server-truth role with whatever was last persisted. That
+  // was the bug where a refreshed driver session kept landing on the customer
+  // home — persisted role hydrated after restoreSession completed.
+  const [splashAnimDone, setSplashAnimDone] = useState(false);
+  const [hydrated, setHydrated] = useState(() =>
+    useAuthStore.persist.hasHydrated(),
+  );
 
   const onboardingDone = useAuthStore((s) => s.onboardingDone);
   const authed = useAuthStore((s) => s.authed);
   const signupDone = useAuthStore((s) => s.signupDone);
   const authChoice = useAuthStore((s) => s.authChoice);
   const phone = useAuthStore((s) => s.phone);
+  const role = useAuthStore((s) => s.role);
+  const sessionRestored = useAuthStore((s) => s.sessionRestored);
+  const splashDone = splashAnimDone && hydrated && sessionRestored;
   const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
   const completeSignup = useAuthStore((s) => s.completeSignup);
   const restoreSession = useAuthStore((s) => s.restoreSession);
@@ -53,25 +69,56 @@ export default function RootLayout(): React.ReactNode {
     }
   }, [fontsLoaded]);
 
-  // Restore session and fetch menu on app start. Also kick off image
-  // preloading so the onboarding/auth flow doesn't decode 7 large PNGs
-  // simultaneously during a screen transition (OOM risk on low-end Android).
+  // Subscribe to zustand persist hydration. The store may already be hydrated
+  // by the time this effect runs (synchronous hydration on subsequent mounts),
+  // so we both check the current state and listen for future completion.
   useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) {
+      setHydrated(true);
+      return;
+    }
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      setHydrated(true);
+    });
+    return () => unsub();
+  }, []);
+
+  // Restore session AFTER hydration completes. Order matters: if we ran this
+  // before hydration, AsyncStorage's later set() would clobber the server-
+  // truth role we just fetched.
+  useEffect(() => {
+    if (!hydrated) return;
     void restoreSession();
     void fetchMenu();
     void preloadFlowImages();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
 
-  // Fetch profile when user becomes authed
+  // Current URL segments. Drives the role-based guard below: a driver session
+  // whose URL is still `/` (because expo-router restored the last customer
+  // route, or `/` is the default) needs to be redirected into the driver
+  // subtree before any customer screen paints.
+  const segments = useSegments() as string[];
+  const inDriverSubtree = segments[0] === "driver";
+
+  // Fetch profile when user becomes authed. Customer-only — driver fetches
+  // live in the driver screens, and these endpoints (favorites, customer
+  // notifications, customer profile) aren't useful for the driver role.
   useEffect(() => {
-    if (authed) {
+    if (authed && role !== "driver") {
       void fetchProfile();
       void fetchNotifications();
       void fetchFavorites();
       void registerForPushAsync();
     }
+    if (authed && role === "driver") {
+      // Same Expo push token, different server endpoint (/driver/push-token).
+      // Registration is what lets the backend's assignment push reach this
+      // device, gated on the driver's is_active flag server-side.
+      void registerDriverPushAsync();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed]);
+  }, [authed, role]);
 
   // Realtime: subscribe to my own notifications row inserts so new ones land
   // instantly without waiting for the OS push or a manual refresh. RLS limits
@@ -162,7 +209,7 @@ export default function RootLayout(): React.ReactNode {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="dark" />
-        <AnimatedSplash onComplete={() => setSplashDone(true)} />
+        <AnimatedSplash onComplete={() => setSplashAnimDone(true)} />
       </GestureHandlerRootView>
     );
   }
@@ -185,6 +232,15 @@ export default function RootLayout(): React.ReactNode {
     );
   }
 
+  if (!authed && authChoice === "driver-signin") {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar style="dark" />
+        <DriverAuthFlow />
+      </GestureHandlerRootView>
+    );
+  }
+
   if (!authed) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -198,11 +254,42 @@ export default function RootLayout(): React.ReactNode {
     );
   }
 
-  if (!signupDone) {
+  // Drivers skip signup (they're admin-created with name already filled).
+  // Without this guard, a driver with a stale signupDone=false in persisted
+  // state would land on the customer-flavored SignupForm before reaching the
+  // role branch below.
+  if (!signupDone && role !== "driver") {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="dark" />
         <SignupForm phone={phone} onComplete={completeSignup} />
+      </GestureHandlerRootView>
+    );
+  }
+
+  // Role enforcement at the routing layer. Expo-router is URL-driven and will
+  // happily render whichever screen the current URL resolves to, regardless
+  // of what <Stack.Screen> elements we declare below. So we short-circuit
+  // the render with <Redirect> whenever the current segments don't match the
+  // authenticated role. This is what actually keeps a driver out of the
+  // customer subtree (and vice versa).
+  if (role === "driver" && !inDriverSubtree) {
+    return <Redirect href={"/driver" as never} />;
+  }
+  if (role === "customer" && inDriverSubtree) {
+    return <Redirect href="/" />;
+  }
+
+  if (role === "driver") {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="driver" />
+            <Stack.Screen name="settings/[slug]" />
+          </Stack>
+        </SafeAreaProvider>
       </GestureHandlerRootView>
     );
   }

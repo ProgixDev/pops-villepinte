@@ -19,6 +19,7 @@ import { AccompagnementsModule } from './modules/accompagnements/accompagnements
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { DriversModule } from './modules/drivers/drivers.module';
+import { DriversMeModule } from './modules/drivers-me/drivers-me.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { DriversModule } from './modules/drivers/drivers.module';
     NotificationsModule,
     FavoritesModule,
     DriversModule,
+    DriversMeModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SupabaseAuthGuard },

@@ -410,7 +410,23 @@ export class OrdersService {
       .single();
 
     if (error) throw new NotFoundException('Order not found');
-    return data;
+
+    // Surface the in-flight driver for the live tracking map. Only the
+    // accepted-and-undelivered assignment is relevant; everything else (past
+    // refused, cancelled, prior pending attempts) stays in the database but
+    // not in the response.
+    const { data: assignment } = await this.supabase
+      .from('order_assignments')
+      .select('driver_id')
+      .eq('order_id', orderId)
+      .eq('status', 'accepted')
+      .is('delivered_at', null)
+      .maybeSingle();
+
+    return {
+      ...data,
+      active_driver_id: assignment?.driver_id ?? null,
+    };
   }
 
   async cancelCustomerOrder(userId: string, orderId: string) {

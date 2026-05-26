@@ -20,7 +20,9 @@ export default function AuthIndex(): React.ReactElement {
   // landing renders instantly instead of blocking on the image grid.
   const patternReady = useDeferredMount();
 
-  const handleChoose = (choice: "signin" | "register"): void => {
+  const handleChoose = (
+    choice: "signin" | "register" | "driver-signin",
+  ): void => {
     void Haptics.selectionAsync();
     setAuthChoice(choice);
   };
@@ -131,6 +133,26 @@ export default function AuthIndex(): React.ReactElement {
               }}
             >
               S'inscrire
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => handleChoose("driver-signin")}
+            style={({ pressed }) => ({
+              alignItems: "center",
+              paddingVertical: 6,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Text
+              style={{
+                fontFamily: "Poppins_500Medium",
+                fontSize: 13,
+                color: "rgba(0,0,0,0.6)",
+                textDecorationLine: "underline",
+              }}
+            >
+              Je suis livreur
             </Text>
           </Pressable>
         </View>

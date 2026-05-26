@@ -49,10 +49,17 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "POP'S utilise ta position pour suggérer ton adresse de livraison."
+          "locationWhenInUsePermission": "POP'S utilise ta position pour la carte et la livraison."
         }
       ],
       "@rnmapbox/maps",
+      [
+        "@badatgil/expo-mapbox-navigation",
+        {
+          "accessToken": "pk.your_public_token_here",
+          "mapboxMapsVersion": "11.20.1"
+        }
+      ],
       [
         "expo-build-properties",
         {

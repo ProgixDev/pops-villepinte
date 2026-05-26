@@ -1,0 +1,13 @@
+diff --git a/node_modules/@badatgil/expo-mapbox-navigation/ios/ExpoMapboxNavigationView.swift b/node_modules/@badatgil/expo-mapbox-navigation/ios/ExpoMapboxNavigationView.swift
+index 8f841df..3063fd5 100644
+--- a/node_modules/@badatgil/expo-mapbox-navigation/ios/ExpoMapboxNavigationView.swift
++++ b/node_modules/@badatgil/expo-mapbox-navigation/ios/ExpoMapboxNavigationView.swift
+@@ -40,7 +40,7 @@ class ExpoMapboxNavigationView: ExpoView {
+ 
+ 
+ class ExpoMapboxNavigationViewController: UIViewController {
+-    static let navigationProvider: MapboxNavigationProvider = MapboxNavigationProvider(coreConfig: CoreConfig(routingConfig: RoutingConfig(fasterRouteDetectionConfig: Optional<FasterRouteDetectionConfig>.none),locationSource: .live ))
++    static let navigationProvider: MapboxNavigationProvider = MapboxNavigationProvider(coreConfig: CoreConfig(routingConfig: RoutingConfig(fasterRouteDetectionConfig: Optional<FasterRouteDetectionConfig>.none),locationSource: .simulation(initialLocation: nil) ))
+     var mapboxNavigation: MapboxNavigation? = nil
+     var routingProvider: RoutingProvider? = nil
+     var navigation: NavigationController? = nil

@@ -9,6 +9,12 @@ import Animated, {
 
 export type GreetingProps = {
   name: string;
+  /**
+   * Optional override for the line below the greeting. Defaults to the
+   * customer-facing question. The driver Home passes its own status copy
+   * (e.g. "Tu es en ligne. On t'envoie une course.").
+   */
+  subtitle?: string;
 };
 
 function formatFrenchDate(date: Date): string {
@@ -19,7 +25,10 @@ function formatFrenchDate(date: Date): string {
   }).format(date);
 }
 
-export default function Greeting({ name }: GreetingProps): React.ReactElement {
+export default function Greeting({
+  name,
+  subtitle,
+}: GreetingProps): React.ReactElement {
   const reducedMotion = useReducedMotion();
   const opacity = useSharedValue(reducedMotion ? 1 : 0);
   const translateY = useSharedValue(reducedMotion ? 0 : 12);
@@ -68,7 +77,7 @@ export default function Greeting({ name }: GreetingProps): React.ReactElement {
         className="font-sans-semibold text-on-surface-variant"
         style={{ fontSize: 22, lineHeight: 28, marginTop: 6 }}
       >
-        Qu&apos;est-ce qui vous fait envie ?
+        {subtitle ?? "Qu'est-ce qui vous fait envie ?"}
       </Text>
     </Animated.View>
   );
