@@ -6,8 +6,12 @@ import { setCurrentAccessToken, supabase } from "@/lib/supabase";
 import { useFavoritesStore } from "./favorites.store";
 import { asyncStorageAdapter } from "./_storage";
 
-const API_BASE =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
+// Strip any trailing slash so a `.../api/v1/` base + `/path` doesn't become a
+// `//` URL — that triggers a Vercel 308 redirect whose POST body iOS can't
+// replay, surfacing as "Network request failed" (Android masks it via OkHttp).
+const API_BASE = (
+  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api/v1"
+).replace(/\/+$/, "");
 
 export type AuthChoice = "signin" | "register" | "driver-signin" | null;
 

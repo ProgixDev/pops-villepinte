@@ -1,7 +1,12 @@
 import { getCurrentAccessToken, supabase } from "./supabase";
 
-const API_BASE =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
+// Strip any trailing slash: joining a `.../api/v1/` base with a `/path` produces
+// a `//` URL that Vercel answers with a 308 redirect. iOS can't replay a POST
+// body across that redirect, so requests fail with "Network request failed"
+// (Android's OkHttp replays the body and masks the bug).
+const API_BASE = (
+  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api/v1"
+).replace(/\/+$/, "");
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
