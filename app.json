@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.progix.popsvillepinte",
+      "buildNumber": "8",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -17,6 +18,7 @@
     },
     "android": {
       "package": "com.progix.popsvillepinte",
+      "versionCode": 8,
       "adaptiveIcon": {
         "backgroundColor": "#FFCE00",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -52,12 +54,17 @@
           "locationWhenInUsePermission": "POP'S utilise ta position pour la carte et la livraison."
         }
       ],
-      "@rnmapbox/maps",
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsVersion": "= 11.11.0"
+        }
+      ],
       [
         "@badatgil/expo-mapbox-navigation",
         {
           "accessToken": "pk.your_public_token_here",
-          "mapboxMapsVersion": "11.20.1"
+          "mapboxMapsVersion": "11.11.0"
         }
       ],
       [
@@ -67,7 +74,8 @@
             "minSdkVersion": 24
           },
           "ios": {
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "15.1",
+            "useFrameworks": "static"
           }
         }
       ],
