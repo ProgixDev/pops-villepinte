@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import {
+  InteractionManager,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { useShallow } from "zustand/react/shallow";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Camera,
   MapView,
-  PointAnnotation,
+  MarkerView,
   UserLocation,
 } from "@rnmapbox/maps";
 import { LocateFixed, MapPin, Package } from "lucide-react-native";
@@ -59,6 +65,21 @@ export default function DriverHomeScreen(): React.ReactElement {
   // first GPS fix arrives (or if location permission is denied). The recenter
   // button is disabled while this is null.
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
+
+  // Defer mounting the native <MapView> until the screen-entry transition has
+  // settled. Mounting a heavy Fabric native view (the map) on the JS thread
+  // *while* React Navigation's native-driven "shift" tab transition is doing a
+  // synchronous view update on the main thread deadlocks the two threads on the
+  // Fabric ComponentDescriptorRegistry lock — a hard freeze on iOS. The client
+  // side never hits this because its first tab has no map. runAfterInteractions
+  // lets the transition release the UI thread before we commit the map.
+  const [mapReady, setMapReady] = useState(false);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setMapReady(true);
+    });
+    return () => task.cancel();
+  }, []);
 
   useEffect(() => {
     void fetchProfile();
@@ -149,15 +170,22 @@ export default function DriverHomeScreen(): React.ReactElement {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <MapView
-        style={{ flex: 1 }}
-        styleURL={DRIVER_MAP_STYLE}
-        scaleBarEnabled={false}
-        logoEnabled={false}
-        attributionPosition={{ bottom: 8, left: 8 }}
-        compassEnabled={false}
-      >
-        <Camera ref={cameraRef} />
+      {mapReady ? (
+        <MapView
+          style={{ flex: 1 }}
+          styleURL={DRIVER_MAP_STYLE}
+          scaleBarEnabled={false}
+          logoEnabled={false}
+          attributionPosition={{ bottom: 8, left: 8 }}
+          compassEnabled={false}
+        >
+          <Camera
+          ref={cameraRef}
+          defaultSettings={{
+            centerCoordinate: POPS_COORDS,
+            zoomLevel: 13,
+          }}
+        />
         <UserLocation
           visible
           androidRenderMode="normal"
@@ -172,23 +200,29 @@ export default function DriverHomeScreen(): React.ReactElement {
           }}
         />
 
-        <PointAnnotation id="pops-pickup" coordinate={POPS_COORDS}>
+        <MarkerView
+          coordinate={POPS_COORDS}
+          anchor={{ x: 0.5, y: 0.5 }}
+          allowOverlap
+        >
           <View style={mapStyles.pickupPin}>
             <Package size={16} color={colors.ink} strokeWidth={2.5} />
           </View>
-        </PointAnnotation>
+        </MarkerView>
 
         {active && active.dropoff.coordinates[0] !== 0 ? (
-          <PointAnnotation
-            id="active-dropoff"
+          <MarkerView
             coordinate={[...active.dropoff.coordinates] as [number, number]}
+            anchor={{ x: 0.5, y: 0.5 }}
+            allowOverlap
           >
             <View style={mapStyles.dropoffPin}>
               <MapPin size={16} color={colors.surface} strokeWidth={2.5} />
             </View>
-          </PointAnnotation>
+          </MarkerView>
         ) : null}
-      </MapView>
+        </MapView>
+      ) : null}
 
       {/* Floating header — greeting + compact online toggle */}
       <View

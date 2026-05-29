@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.progix.popsvillepinte",
-      "buildNumber": "9",
+      "buildNumber": "10",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.progix.popsvillepinte",
-      "versionCode": 9,
+      "versionCode": 10,
       "adaptiveIcon": {
         "backgroundColor": "#FFCE00",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

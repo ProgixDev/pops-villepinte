@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Pressable, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { InteractionManager, Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { X } from "lucide-react-native";
 
@@ -60,6 +60,17 @@ export default function DriverNavigateScreen(): React.ReactElement {
     return delivery.pickup.coordinates;
   }, [delivery]);
 
+  // Same deadlock guard as the driver home map: defer mounting the heavy
+  // native navigation view until the push transition settles, so the Fabric
+  // mount doesn't race the native-driven screen animation on the UI thread.
+  const [navReady, setNavReady] = useState(false);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setNavReady(true);
+    });
+    return () => task.cancel();
+  }, []);
+
   if (delivery === undefined || destination === undefined) {
     return (
       <Fallback message="Course introuvable." onClose={() => router.back()} />
@@ -92,18 +103,20 @@ export default function DriverNavigateScreen(): React.ReactElement {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
-      <NavView
-        style={{ flex: 1 }}
-        coordinates={[
-          { longitude: origin[0], latitude: origin[1] },
-          { longitude: destination[0], latitude: destination[1] },
-        ]}
-        travelMode="driving-traffic"
-        language="fr"
-        units="metric"
-        onArrive={() => router.back()}
-        onCancelNavigation={() => router.back()}
-      />
+      {navReady ? (
+        <NavView
+          style={{ flex: 1 }}
+          coordinates={[
+            { longitude: origin[0], latitude: origin[1] },
+            { longitude: destination[0], latitude: destination[1] },
+          ]}
+          travelMode="driving-traffic"
+          language="fr"
+          units="metric"
+          onArrive={() => router.back()}
+          onCancelNavigation={() => router.back()}
+        />
+      ) : null}
 
       <Pressable
         accessibilityRole="button"
