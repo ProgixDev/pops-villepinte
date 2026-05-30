@@ -224,7 +224,7 @@ export default function AuthFlow({
         <View
           style={{
             flexDirection: "row",
-            gap: 10,
+            gap: 8,
             marginTop: 36,
           }}
         >
@@ -240,8 +240,13 @@ export default function AuthFlow({
               keyboardType="number-pad"
               maxLength={1}
               style={{
-                width: 50,
-                height: 64,
+                // Flex so the six boxes always fit the row regardless of screen
+                // width (fixed 50px overflowed the 6th box on narrow Android
+                // phones). aspectRatio keeps them tall rectangles.
+                flex: 1,
+                minWidth: 0,
+                aspectRatio: 0.78,
+                maxHeight: 64,
                 borderRadius: 14,
                 backgroundColor: colors.ink,
                 textAlign: "center",

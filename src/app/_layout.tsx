@@ -1,9 +1,11 @@
 import "../../global.css";
 
 import { useEffect, useState } from "react";
+import { AppState, Platform } from "react-native";
 import { Redirect, Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
+import * as NavigationBar from "expo-navigation-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -74,6 +76,24 @@ export default function RootLayout(): React.ReactNode {
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [fontsLoaded]);
+
+  // Android immersive mode: hide the OS bottom navigation bar for a fullscreen
+  // app. "overlay-swipe" = immersive-sticky — the bar stays hidden but a swipe
+  // from the edge reveals it temporarily, then it auto-hides again. The OS
+  // re-shows the bar after returning from background or some system dialogs, so
+  // we re-apply on every AppState "active". No-op on iOS (no OS nav bar).
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const hide = (): void => {
+      NavigationBar.setVisibilityAsync("hidden").catch(() => {});
+      NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
+    };
+    hide();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") hide();
+    });
+    return () => sub.remove();
+  }, []);
 
   // Subscribe to zustand persist hydration. The store may already be hydrated
   // by the time this effect runs (synchronous hydration on subsequent mounts),

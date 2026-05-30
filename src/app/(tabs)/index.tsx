@@ -49,21 +49,36 @@ const DEFAULT_MARQUEE_TEXT =
 
 function MarqueeTape({ text }: { text?: string | null }): React.ReactElement {
   const translateX = useRef(new RNAnimated.Value(0)).current;
-  // CMS-driven; pad both ends so the looped seam has breathing room.
+  // CMS-driven; pad the end so consecutive copies don't touch.
   const base = text && text.trim() ? text.trim() : DEFAULT_MARQUEE_TEXT;
-  const marqueeDouble = `   ${base}   ` + `   ${base}   `;
+  const segment = `${base}     `;
+
+  // Width of ONE rendered copy, measured at runtime. Driving the loop off the
+  // real measured width (rather than a hardcoded SCREEN_WIDTH multiple) keeps it
+  // a single line + seamless for any text length or screen size.
+  const [copyWidth, setCopyWidth] = useState(0);
 
   useEffect(() => {
+    if (copyWidth <= 0) return;
+    translateX.setValue(0);
+    // Constant scroll speed (~60px/s) regardless of text length.
     const anim = RNAnimated.loop(
       RNAnimated.timing(translateX, {
-        toValue: -SCREEN_WIDTH * 2,
-        duration: 18000,
+        toValue: -copyWidth,
+        duration: (copyWidth / 60) * 1000,
         useNativeDriver: true,
       }),
     );
     anim.start();
     return () => anim.stop();
-  }, [translateX]);
+  }, [copyWidth, translateX]);
+
+  const segmentStyle = {
+    fontFamily: font.display,
+    fontSize: 12,
+    letterSpacing: 2,
+    color: colors.primary,
+  } as const;
 
   return (
     <View
@@ -81,16 +96,17 @@ function MarqueeTape({ text }: { text?: string | null }): React.ReactElement {
           transform: [{ translateX }],
         }}
       >
+        {/* First copy is measured; both forced to a single line so the bar is
+            always exactly one row tall, never wrapping. */}
         <Text
-          style={{
-            fontFamily: font.display,
-            fontSize: 12,
-            letterSpacing: 2,
-            color: colors.primary,
-            width: SCREEN_WIDTH * 4,
-          }}
+          numberOfLines={1}
+          onLayout={(e) => setCopyWidth(e.nativeEvent.layout.width)}
+          style={segmentStyle}
         >
-          {marqueeDouble}
+          {segment}
+        </Text>
+        <Text numberOfLines={1} style={segmentStyle}>
+          {segment}
         </Text>
       </RNAnimated.View>
     </View>
