@@ -22,6 +22,7 @@ import { ManageProductSupplementsDto } from './dto/manage-product-supplements.dt
 import { ManageProductVariantsDto } from './dto/manage-product-variants.dto';
 import { SetHomeSignaturesDto } from './dto/set-home-signatures.dto';
 import { SetHomeAdviceDto } from './dto/set-home-advice.dto';
+import { UpdateHomeContentDto } from './dto/update-home-content.dto';
 import { UpdateShopSettingsDto } from './dto/update-shop-settings.dto';
 import { CreateAccompagnementDto } from './dto/create-accompagnement.dto';
 import { UpdateAccompagnementDto } from './dto/update-accompagnement.dto';
@@ -149,6 +150,17 @@ export class AdminCatalogueController {
   @Put('home/advice')
   setHomeAdvice(@Body() dto: SetHomeAdviceDto) {
     return this.catalogueService.setHomeAdvice(dto);
+  }
+
+  // Home content (bandeau marquee + bloc story)
+  @Get('home/content')
+  getHomeContent() {
+    return this.catalogueService.getHomeContent();
+  }
+
+  @Put('home/content')
+  updateHomeContent(@Body() dto: UpdateHomeContentDto) {
+    return this.catalogueService.updateHomeContent(dto);
   }
 
   // Shop settings (public-facing opening days/hours strings)

@@ -1,8 +1,8 @@
-import { ArrayMaxSize, IsArray, IsString } from 'class-validator';
+import { IsArray, IsString } from 'class-validator';
 
 export class SetHomeSignaturesDto {
+  // No max — admin can feature any number of signature products.
   @IsArray()
-  @ArrayMaxSize(3)
   @IsString({ each: true })
   product_ids: string[];
 }

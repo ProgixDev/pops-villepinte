@@ -324,9 +324,8 @@ export class AdminCatalogueService {
   }
 
   async setHomeSignatures(dto: SetHomeSignaturesDto) {
-    if (dto.product_ids.length > 3) {
-      throw new BadRequestException('Maximum 3 signature products allowed');
-    }
+    // No upper bound — the admin can feature any number of signature products;
+    // the mobile hero carousel renders all of them in order.
 
     if (dto.product_ids.length > 0) {
       const { data: existing, error: lookupError } = await this.supabase
