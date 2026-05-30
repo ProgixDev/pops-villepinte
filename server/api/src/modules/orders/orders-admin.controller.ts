@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -51,5 +52,10 @@ export class OrdersAdminController {
   @Patch(':id/cancel')
   cancelOrder(@Param('id') id: string) {
     return this.ordersService.adminCancelOrder(id);
+  }
+
+  @Delete(':id')
+  deleteOrder(@Param('id') id: string) {
+    return this.ordersService.deleteOrder(id);
   }
 }

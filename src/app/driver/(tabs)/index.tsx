@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   InteractionManager,
   Pressable,
@@ -132,70 +132,46 @@ export default function DriverHomeScreen(): React.ReactElement {
     });
   };
 
-  // Auto-center on the driver once on first GPS fix. After that, the camera
-  // is driven by either the user (panning), the cameraFit memo (active
-  // delivery bounds), or the recenter button. We don't want to keep pulling
-  // the camera back to the driver every location update — that fights with
-  // manual panning.
+  // Default view: as soon as we have a GPS fix, center & zoom on the driver.
+  // This is the primary framing — the livreur map opens on *them*, not the
+  // store. Runs once; afterwards the camera follows manual panning, the
+  // recenter button, or a newly-assigned delivery (below). We also mark any
+  // already-active delivery as "framed" so the route-fit effect doesn't
+  // immediately yank the camera off the driver on load.
   const didInitialCenterRef = useRef(false);
+  const lastFramedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!mapLoaded) return;
-    if (didInitialCenterRef.current) return;
-    if (!userCoords) return;
+    if (!mapLoaded || !userCoords || didInitialCenterRef.current) return;
     didInitialCenterRef.current = true;
-    // Skip if there's an active delivery — the cameraFit effect below will
-    // frame the route, which is more useful than centering on the driver.
-    if (active) return;
+    lastFramedRef.current = active?.id ?? null;
     cameraRef.current?.setCamera({
       centerCoordinate: userCoords,
-      zoomLevel: 15.5,
+      zoomLevel: 16,
       animationDuration: 600,
     });
   }, [mapLoaded, userCoords, active]);
 
-  // Frame the map on POP'S + the active dropoff (if any). Recomputes only
-  // when the active dropoff coordinates change.
-  const cameraFit = useMemo<{
-    centerCoordinate: [number, number];
-    zoomLevel: number;
-    bounds?: { ne: [number, number]; sw: [number, number]; padding: number };
-  }>(() => {
-    if (active && active.dropoff.coordinates[0] !== 0) {
-      const [lng, lat] = active.dropoff.coordinates;
-      const ne: [number, number] = [
-        Math.max(POPS_COORDS[0], lng),
-        Math.max(POPS_COORDS[1], lat),
-      ];
-      const sw: [number, number] = [
-        Math.min(POPS_COORDS[0], lng),
-        Math.min(POPS_COORDS[1], lat),
-      ];
-      return {
-        centerCoordinate: POPS_COORDS,
-        zoomLevel: 13,
-        bounds: { ne, sw, padding: 80 },
-      };
-    }
-    return { centerCoordinate: POPS_COORDS, zoomLevel: 13 };
-  }, [active]);
-
+  // When a NEW delivery becomes active (assigned while the app is open), frame
+  // driver → dropoff once so the courier sees where they're headed. Keyed on
+  // the active id via a ref so it never refits on every render, and never
+  // overrides the driver-centered default above for the delivery already in
+  // hand at load. Falls back to anchoring on POP'S when there's no GPS fix.
   useEffect(() => {
-    if (!mapLoaded) return;
-    if (cameraFit.bounds) {
-      cameraRef.current?.fitBounds(
-        cameraFit.bounds.ne,
-        cameraFit.bounds.sw,
-        cameraFit.bounds.padding,
-        600,
-      );
-    } else {
-      cameraRef.current?.setCamera({
-        centerCoordinate: cameraFit.centerCoordinate,
-        zoomLevel: cameraFit.zoomLevel,
-        animationDuration: 600,
-      });
-    }
-  }, [mapLoaded, cameraFit]);
+    if (!mapLoaded || !active || active.dropoff.coordinates[0] === 0) return;
+    if (lastFramedRef.current === active.id) return;
+    lastFramedRef.current = active.id;
+    const [lng, lat] = active.dropoff.coordinates;
+    const anchor = userCoords ?? POPS_COORDS;
+    const ne: [number, number] = [
+      Math.max(anchor[0], lng),
+      Math.max(anchor[1], lat),
+    ];
+    const sw: [number, number] = [
+      Math.min(anchor[0], lng),
+      Math.min(anchor[1], lat),
+    ];
+    cameraRef.current?.fitBounds(ne, sw, 80, 600);
+  }, [mapLoaded, active, userCoords]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

@@ -20,7 +20,9 @@ export const ORDER_STATUS_TRANSITIONS_DELIVERY: Record<
   received: ['preparing', 'cancelled'],
   preparing: ['ready', 'cancelled'],
   ready: ['handed_to_livreur', 'cancelled'],
-  handed_to_livreur: ['picked_up'],
+  // The driver can cancel a course already in their hands when the client is a
+  // no-show (or unreachable at the delivery address).
+  handed_to_livreur: ['picked_up', 'cancelled'],
   picked_up: [],
   cancelled: [],
 };

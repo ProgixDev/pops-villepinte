@@ -12,6 +12,7 @@ import { CurrentUser, AuthUser } from '../../common/decorators/current-user.deco
 import { DriverGuard } from '../../common/guards/driver.guard';
 import { AssignmentsQueryDto } from './dto/assignments-query.dto';
 import { EarningsQueryDto } from './dto/earnings-query.dto';
+import { CancelAssignmentDto } from './dto/cancel-assignment.dto';
 import { MarkDeliveredDto } from './dto/mark-delivered.dto';
 import { OnlineStatusDto } from './dto/online-status.dto';
 import { PushTokenDto } from './dto/push-token.dto';
@@ -76,6 +77,15 @@ export class DriversMeController {
       method: dto.method,
       code: dto.code,
     });
+  }
+
+  @Patch('assignments/:id/cancel')
+  cancel(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: CancelAssignmentDto,
+  ) {
+    return this.svc.cancelByDriver(user.id, id, dto.reason);
   }
 
   @Post('assignments/:id/report')

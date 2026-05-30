@@ -258,6 +258,48 @@ export class DriversMeService {
     return data;
   }
 
+  /**
+   * Driver cancels a course already in their hands — typically a client
+   * no-show, or a customer who's unreachable at the delivery address. Walks the
+   * order to 'cancelled' (which stamps cancelled_at, broadcasts the kanban
+   * event and pushes the customer "Commande annulée") and records the reason on
+   * the assignment so the superadmin can see why it fell through.
+   */
+  async cancelByDriver(
+    driverId: string,
+    assignmentId: string,
+    reason?: string,
+  ) {
+    const current = await this.getMyAssignment(driverId, assignmentId);
+    if (current.status !== 'accepted') {
+      throw new BadRequestException(
+        'Seule une course en cours peut être annulée.',
+      );
+    }
+    if (current.delivered_at) {
+      throw new BadRequestException('Cette course est déjà livrée.');
+    }
+    if (!current.order_id) {
+      throw new BadRequestException('Commande liée introuvable.');
+    }
+
+    // ready / handed_to_livreur → cancelled (allowed in the delivery
+    // transition graph). Fires the customer "Commande annulée" push.
+    await this.orders.advanceOrderStatus(current.order_id, 'cancelled');
+
+    const { data, error } = await this.supabase
+      .from('order_assignments')
+      .update({
+        status: 'cancelled',
+        note: reason?.trim() || current.note || 'Annulée par le livreur',
+      })
+      .eq('id', assignmentId)
+      .select(ASSIGNMENT_SELECT)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
   /** Driver files a delivery problem ticket. Does NOT mark the course delivered. */
   async reportProblem(
     driverId: string,

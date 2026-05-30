@@ -637,6 +637,24 @@ export class OrdersService {
     return this.updateStatus(orderId, 'picked_up');
   }
 
+  /**
+   * Hard-delete an order and everything attached to it — order_items,
+   * order_assignments, delivery_tickets, driver_ratings and notifications all
+   * cascade via their FKs. Admin-only; unlike cancel this leaves no trace, so
+   * the dashboard uses it for test/spam rows rather than real cancellations.
+   */
+  async deleteOrder(orderId: string) {
+    // Surfaces a clean 404 instead of silently no-op'ing a bad id.
+    await this.getOrderById(orderId);
+    const { error } = await this.supabase
+      .from('orders')
+      .delete()
+      .eq('id', orderId);
+    if (error) throw error;
+    this.gateway.emit({ type: 'order:deleted', data: { id: orderId } });
+    return { deleted: true, id: orderId };
+  }
+
   async adminCancelOrder(orderId: string) {
     const order = await this.getOrderById(orderId);
 

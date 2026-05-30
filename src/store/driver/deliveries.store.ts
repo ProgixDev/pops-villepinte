@@ -20,6 +20,7 @@ type DeliveriesState = {
     id: string,
     payload: { method: "qr" | "manual"; code?: string },
   ) => Promise<void>;
+  cancelDelivery: (id: string, reason?: string) => Promise<void>;
   reportProblem: (
     id: string,
     payload: { category: string; description?: string },
@@ -78,6 +79,18 @@ export const useDeliveriesStore = create<DeliveriesState>()((set, get) => ({
 
   markDelivered: async (id, payload) => {
     const updated = await driverApi.delivered(id, payload);
+    const mapped = mapAssignmentToDelivery(updated);
+    set((s) => {
+      const next = { ...s.byId, [id]: mapped };
+      return {
+        byId: next,
+        activeId: s.activeId === id ? null : s.activeId,
+      };
+    });
+  },
+
+  cancelDelivery: async (id, reason) => {
+    const updated = await driverApi.cancelDelivery(id, reason);
     const mapped = mapAssignmentToDelivery(updated);
     set((s) => {
       const next = { ...s.byId, [id]: mapped };

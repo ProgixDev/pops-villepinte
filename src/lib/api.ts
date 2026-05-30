@@ -351,6 +351,13 @@ export const driverApi = {
       method: "POST",
       body,
     }),
+  // Driver cancels a course in their hands (client no-show / unreachable). The
+  // linked order is moved to "cancelled" server-side.
+  cancelDelivery: (id: string, reason?: string) =>
+    api<DriverAssignment>(`/driver/assignments/${id}/cancel`, {
+      method: "PATCH",
+      body: { reason: reason?.trim() || undefined },
+    }),
   earnings: (period?: "today" | "week" | "month") =>
     api<DriverEarnings>("/driver/earnings", {
       params: period ? { period } : undefined,

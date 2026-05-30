@@ -29,6 +29,7 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
   const router = useRouter();
   const delivery = useDeliveriesStore((s) => (id ? s.byId[id] : undefined));
   const respond = useDeliveriesStore((s) => s.respond);
+  const cancelDelivery = useDeliveriesStore((s) => s.cancelDelivery);
   const fetchDeliveries = useDeliveriesStore((s) => s.fetch);
   // Superadmin support line (configured in the admin dashboard). The call tile
   // only renders when one is set.
@@ -113,6 +114,40 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
     router.push(`/driver/scan/${delivery.id}` as never);
   };
 
+  const onCancelNoShow = (): void => {
+    if (busy) return;
+    Alert.alert(
+      "Annuler la course ?",
+      "À utiliser si le client ne vient pas récupérer la commande ou reste injoignable. La commande sera annulée et tu seras libéré.",
+      [
+        { text: "Retour", style: "cancel" },
+        {
+          text: "Client absent — annuler",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                setBusy(true);
+                await cancelDelivery(delivery.id, "Client absent");
+                Haptics.notificationAsync(
+                  Haptics.NotificationFeedbackType.Warning,
+                ).catch(() => {});
+                router.back();
+              } catch (e) {
+                Alert.alert(
+                  "Erreur",
+                  e instanceof Error ? e.message : "Erreur réseau",
+                );
+              } finally {
+                setBusy(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   const primaryLabel = NEXT_LABEL[delivery.status];
   const showDeliveredBtn = delivery.status === "accepted";
 
@@ -140,6 +175,35 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
               busy={busy}
               success
             />
+          ) : null}
+          {showDeliveredBtn ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Client absent — annuler la course"
+              onPress={onCancelNoShow}
+              disabled={busy}
+              style={({ pressed }) => ({
+                borderRadius: 16,
+                paddingVertical: 14,
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1.5,
+                borderColor: colors.accent,
+                opacity: pressed || busy ? 0.7 : 1,
+              })}
+            >
+              <Text
+                style={{
+                  fontFamily: "Poppins_700Bold",
+                  fontSize: 13,
+                  letterSpacing: 1,
+                  color: colors.accent,
+                  textTransform: "uppercase",
+                }}
+              >
+                Client absent — annuler
+              </Text>
+            </Pressable>
           ) : null}
         </View>
       }

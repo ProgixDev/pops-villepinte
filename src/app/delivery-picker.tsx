@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  InteractionManager,
   Keyboard,
   Pressable,
   Text,
@@ -108,16 +109,48 @@ export default function DeliveryPickerScreen(): React.ReactElement {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // The Mapbox LocationPuck must only be mounted once foreground location
-  // permission is granted — rendering it while the status is still undetermined
-  // crashes the iOS Mapbox SDK. We resolve the permission on mount; it's
-  // usually already granted because the home screen requested it after sign-in.
+  // Only mount the <LocationPuck> once foreground permission is actually
+  // granted — rendering it while the status is undetermined crashes the Mapbox
+  // SDK. Mirrors the driver home screen.
   const [locationGranted, setLocationGranted] = useState(false);
+  // Gate the whole map mount on the permission prompt being answered. rnmapbox
+  // starts its location engine at map load, so the puck must be present in the
+  // map's FIRST render — otherwise it won't track until the screen is reopened.
+  const [permResolved, setPermResolved] = useState(false);
+
+  // Defer mounting the native <MapView> until the screen-entry transition has
+  // settled. Mounting a heavy Fabric native view (the map) on the JS thread
+  // *while* the navigation push transition is doing a synchronous main-thread
+  // view update deadlocks both threads on the Fabric ComponentDescriptorRegistry
+  // lock — a hard crash/freeze on Android (and iOS). This is the exact guard the
+  // driver home map uses; runAfterInteractions lets the transition release the
+  // UI thread before we commit the map.
+  const [mapReady, setMapReady] = useState(false);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setMapReady(true);
+    });
+    return () => task.cancel();
+  }, []);
+
+  // The <Camera> ref attaches on commit, but the native map view isn't
+  // registered until Mapbox finishes loading the style. Dispatching an
+  // imperative camera command before that sends a viewmanager command to a
+  // reactTag the native side doesn't know yet ("Unknown reactTag"). Gate
+  // imperative camera calls (flyTo / recenter) on this flag.
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Resolve foreground permission up-front, then flip permResolved so the map
+  // can mount with the puck correctly present from its first render.
   useEffect(() => {
     let cancelled = false;
-    void ensureLocationPermission().then((granted) => {
-      if (!cancelled) setLocationGranted(granted);
-    });
+    void ensureLocationPermission()
+      .then((granted) => {
+        if (!cancelled) setLocationGranted(granted);
+      })
+      .finally(() => {
+        if (!cancelled) setPermResolved(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -197,13 +230,18 @@ export default function DeliveryPickerScreen(): React.ReactElement {
     return () => clearTimeout(handle);
   }, [query]);
 
-  const flyTo = useCallback((lat: number, lng: number, zoom = 16) => {
-    cameraRef.current?.setCamera({
-      centerCoordinate: [lng, lat],
-      zoomLevel: zoom,
-      animationDuration: 400,
-    });
-  }, []);
+  const flyTo = useCallback(
+    (lat: number, lng: number, zoom = 16) => {
+      // Don't dispatch a camera command before the native map is registered.
+      if (!mapLoaded) return;
+      cameraRef.current?.setCamera({
+        centerCoordinate: [lng, lat],
+        zoomLevel: zoom,
+        animationDuration: 400,
+      });
+    },
+    [mapLoaded],
+  );
 
   const handleSelectSuggestion = (addr: DeliveryAddress) => {
     void Haptics.selectionAsync();
@@ -357,27 +395,41 @@ export default function DeliveryPickerScreen(): React.ReactElement {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
-      <MapView
-        style={{ flex: 1 }}
-        styleURL={MAPBOX_STYLE_STREETS}
-        compassEnabled={false}
-        attributionPosition={{ bottom: 120, right: 8 }}
-        logoPosition={{ bottom: 120, left: 8 }}
-        scaleBarEnabled={false}
-        onCameraChanged={onCameraChanged}
-        onMapIdle={onMapIdle}
-      >
-        <Camera
-          ref={cameraRef as never}
-          defaultSettings={{
-            centerCoordinate: [initialCoords.lng, initialCoords.lat],
-            zoomLevel: 15,
+      {mapReady && permResolved ? (
+        <MapView
+          style={{ flex: 1 }}
+          styleURL={MAPBOX_STYLE_STREETS}
+          compassEnabled={false}
+          attributionPosition={{ bottom: 120, right: 8 }}
+          logoPosition={{ bottom: 120, left: 8 }}
+          scaleBarEnabled={false}
+          onDidFinishLoadingMap={() => setMapLoaded(true)}
+          onCameraChanged={onCameraChanged}
+          onMapIdle={onMapIdle}
+        >
+          <Camera
+            ref={cameraRef as never}
+            defaultSettings={{
+              centerCoordinate: [initialCoords.lng, initialCoords.lat],
+              zoomLevel: 15,
+            }}
+          />
+          {locationGranted ? (
+            <LocationPuck visible pulsing={{ isEnabled: true }} />
+          ) : null}
+        </MapView>
+      ) : (
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.ink,
           }}
-        />
-        {locationGranted ? (
-          <LocationPuck visible pulsing={{ isEnabled: true }} />
-        ) : null}
-      </MapView>
+        >
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      )}
 
       {/* Fixed centre pin */}
       <View
