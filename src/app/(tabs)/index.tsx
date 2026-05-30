@@ -44,12 +44,14 @@ const HERO_H_PADDING = 20;
 const HERO_SLIDE_WIDTH = SCREEN_WIDTH - HERO_H_PADDING * 2;
 const HERO_AUTOPLAY_MS = 4500;
 
-const MARQUEE_TEXT =
-  "   FAIT MAISON 🔥   SMASH BURGERS   TACOS   BOWLS   WRAPS   DU PEUPLE POUR LE PEUPLE 💛   VILLEPINTE 93   VIENS RÉCUPÉRER   CASH OU CB   ";
-const MARQUEE_DOUBLE = MARQUEE_TEXT + MARQUEE_TEXT;
+const DEFAULT_MARQUEE_TEXT =
+  "FAIT MAISON 🔥   SMASH BURGERS   TACOS   BOWLS   WRAPS   DU PEUPLE POUR LE PEUPLE 💛   VILLEPINTE 93   VIENS RÉCUPÉRER   CASH OU CB";
 
-function MarqueeTape(): React.ReactElement {
+function MarqueeTape({ text }: { text?: string | null }): React.ReactElement {
   const translateX = useRef(new RNAnimated.Value(0)).current;
+  // CMS-driven; pad both ends so the looped seam has breathing room.
+  const base = text && text.trim() ? text.trim() : DEFAULT_MARQUEE_TEXT;
+  const marqueeDouble = `   ${base}   ` + `   ${base}   `;
 
   useEffect(() => {
     const anim = RNAnimated.loop(
@@ -88,7 +90,7 @@ function MarqueeTape(): React.ReactElement {
             width: SCREEN_WIDTH * 4,
           }}
         >
-          {MARQUEE_DOUBLE}
+          {marqueeDouble}
         </Text>
       </RNAnimated.View>
     </View>
@@ -331,6 +333,7 @@ export default function AccueilScreen(): React.ReactElement {
   const PRODUCTS = useMenuStore((s) => s.products);
   const CATEGORIES = useMenuStore((s) => s.categories);
   const SIGNATURES = useMenuStore((s) => s.signatures);
+  const homeContent = useMenuStore((s) => s.homeContent);
   const menuLoading = useMenuStore((s) => s.loading);
   const fetchMenu = useMenuStore((s) => s.fetchMenu);
 
@@ -344,7 +347,8 @@ export default function AccueilScreen(): React.ReactElement {
   }, []);
 
   const heroProducts = useMemo<Product[]>(() => {
-    if (SIGNATURES.length > 0) return SIGNATURES.slice(0, 3);
+    // Admin can feature any number of signatures — show them all.
+    if (SIGNATURES.length > 0) return SIGNATURES;
     const fallback = PRODUCTS.find((p) => p.tags.includes("TOP")) ?? PRODUCTS[0];
     return fallback ? [fallback] : [];
   }, [SIGNATURES, PRODUCTS]);
@@ -416,13 +420,13 @@ export default function AccueilScreen(): React.ReactElement {
             marginTop: 2,
           }}
         >
-          Qu'est-ce qui te fait envie ?
+          Qu&apos;est-ce qui te fait envie ?
         </Text>
       </View>
 
       {/* ── MARQUEE TAPE (deferred; placeholder reserves 42px to avoid layout shift) ── */}
       {heavyReady ? (
-        <MarqueeTape />
+        <MarqueeTape text={homeContent?.marquee_text} />
       ) : (
         <View style={{ height: 42 }} />
       )}
@@ -703,7 +707,7 @@ export default function AccueilScreen(): React.ReactElement {
               letterSpacing: 0.5,
             }}
           >
-            POP'S VILLEPINTE
+            {homeContent?.story_title?.trim() || "POP'S VILLEPINTE"}
           </Text>
           <View
             style={{
@@ -722,8 +726,8 @@ export default function AccueilScreen(): React.ReactElement {
               color: "rgba(255,255,255,0.8)",
             }}
           >
-            Abdoullah en cuisine, fait maison chaque jour. Smash burgers, bowls,
-            tacos — du peuple, pour le peuple.
+            {homeContent?.story_body?.trim() ||
+              "Abdoullah en cuisine, fait maison chaque jour. Smash burgers, bowls, tacos — du peuple, pour le peuple."}
           </Text>
         </View>
       </View>

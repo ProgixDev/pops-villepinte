@@ -19,6 +19,7 @@ import { ManageProductSupplementsDto } from './dto/manage-product-supplements.dt
 import { ManageProductVariantsDto } from './dto/manage-product-variants.dto';
 import { SetHomeSignaturesDto } from './dto/set-home-signatures.dto';
 import { SetHomeAdviceDto } from './dto/set-home-advice.dto';
+import { UpdateHomeContentDto } from './dto/update-home-content.dto';
 import { UpdateShopSettingsDto } from './dto/update-shop-settings.dto';
 import { CreateAccompagnementDto } from './dto/create-accompagnement.dto';
 import { UpdateAccompagnementDto } from './dto/update-accompagnement.dto';
@@ -419,6 +420,35 @@ export class AdminCatalogueService {
 
     if (error) throw error;
     return { advice: data };
+  }
+
+  // Home content (marquee + story) — single-row table, id=1.
+  async getHomeContent() {
+    const { data, error } = await this.supabase
+      .from('home_content')
+      .select('marquee_text, story_title, story_body, updated_at')
+      .eq('id', 1)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async updateHomeContent(dto: UpdateHomeContentDto) {
+    const patch: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (dto.marquee_text !== undefined) patch.marquee_text = dto.marquee_text;
+    if (dto.story_title !== undefined) patch.story_title = dto.story_title;
+    if (dto.story_body !== undefined) patch.story_body = dto.story_body;
+
+    const { data, error } = await this.supabase
+      .from('home_content')
+      .update(patch)
+      .eq('id', 1)
+      .select('marquee_text, story_title, story_body, updated_at')
+      .single();
+    if (error) throw error;
+    return data;
   }
 
   // Shop settings (single-row table, id=1)

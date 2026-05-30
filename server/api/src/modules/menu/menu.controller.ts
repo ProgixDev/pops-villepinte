@@ -42,4 +42,10 @@ export class MenuController {
   getShopSettings() {
     return this.menuService.getShopSettings();
   }
+
+  // Home CMS content (bandeau marquee + bloc story) for the mobile home screen.
+  @Get('home-content')
+  getHomeContent() {
+    return this.menuService.getHomeContent();
+  }
 }

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { menuApi, type ShopSettings } from "@/lib/api";
+import { menuApi, type HomeContent, type ShopSettings } from "@/lib/api";
 import type {
   Accompagnement,
   Category,
@@ -19,6 +19,7 @@ type MenuState = {
   advice: Product[];
   accompagnements: Accompagnement[];
   shopSettings: ShopSettings | null;
+  homeContent: HomeContent | null;
   loading: boolean;
   error: string | null;
   fetchMenu: () => Promise<void>;
@@ -38,6 +39,7 @@ export const useMenuStore = create<MenuState>()(
       advice: [],
       accompagnements: [],
       shopSettings: null,
+      homeContent: null,
       loading: false,
       error: null,
 
@@ -52,6 +54,7 @@ export const useMenuStore = create<MenuState>()(
             adviceResult,
             accompagnementsResult,
             shopSettingsResult,
+            homeContentResult,
           ] = await Promise.all([
             menuApi.getCategories(),
             menuApi.getProducts(),
@@ -60,6 +63,7 @@ export const useMenuStore = create<MenuState>()(
             menuApi.getAdvice().catch(() => [] as unknown[]),
             menuApi.getAccompagnements().catch(() => [] as unknown[]),
             menuApi.getShopSettings().catch(() => null),
+            menuApi.getHomeContent().catch(() => null),
           ]);
           set({
             categories: categories as unknown as Category[],
@@ -69,6 +73,7 @@ export const useMenuStore = create<MenuState>()(
             advice: adviceResult as unknown as Product[],
             accompagnements: accompagnementsResult as unknown as Accompagnement[],
             shopSettings: shopSettingsResult,
+            homeContent: homeContentResult,
             loading: false,
           });
         } catch (e: unknown) {
@@ -110,6 +115,7 @@ export const useMenuStore = create<MenuState>()(
         advice: s.advice,
         accompagnements: s.accompagnements,
         shopSettings: s.shopSettings,
+        homeContent: s.homeContent,
       }),
       version: 3,
     },

@@ -108,4 +108,14 @@ export class MenuService {
       .map((r) => byId.get(r.product_id))
       .filter((p): p is NonNullable<typeof p> => Boolean(p));
   }
+
+  async getHomeContent() {
+    const { data, error } = await this.supabase
+      .from('home_content')
+      .select('marquee_text, story_title, story_body, updated_at')
+      .eq('id', 1)
+      .single();
+    if (error) throw error;
+    return data;
+  }
 }

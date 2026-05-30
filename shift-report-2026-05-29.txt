@@ -1,0 +1,98 @@
+==============================================================================
+ SHIFT REPORT — Mohamed
+ Date: 2026-05-30
+ Projects: POP'S Villepinte (mobile app + back office) & Afroboost
+==============================================================================
+
+SUMMARY
+------------------------------------------------------------------------------
+Productive shift focused on the POP'S driver/delivery experience and the
+back-office (super admin). Shipped 12 commits total across the two POP'S
+repositories (4 in the mobile app, 8 in the back office), covering real-time
+driver assignments, push-notification actions, driver ratings & problem
+reporting, support-phone features, and a dashboard analytics overhaul.
+Also held a working meeting with Patrick and built the Afroboost back office.
+
+Commit window: ~01:05 to 09:21 (2026-05-30)
+
+
+------------------------------------------------------------------------------
+1) POP'S — MOBILE APP (repo: pops-villepinte)        4 commits
+------------------------------------------------------------------------------
+[03:39]  Enabled REAL-TIME order assignments + enhanced push-token management;
+         updated @rnmapbox/maps to 10.3.1.
+         (commit 5e7a52a)
+
+[05:31]  Added the driver "support phone" feature (drivers can reach support
+         directly).
+         (commit 2ee2a14)
+
+[06:16]  Added driver RATING and PROBLEM-REPORTING features.
+         (commit 1dd0b54)
+
+[08:28]  Implemented driver-assignment NOTIFICATION ACTIONS (Accept / Refuse
+         action buttons on the push) and updated the related services.
+         (commit bda6249)
+
+Net effect: a driver now gets a new course in real time, with actionable push
+notifications, can rate and report issues, and reach support — closing the
+loop on the driver delivery flow.
+
+
+------------------------------------------------------------------------------
+2) POP'S — BACK OFFICE / SUPER ADMIN (repo: pops_superadmin)   8 commits
+------------------------------------------------------------------------------
+[01:05]  Removed legacy Android project files/config for a clean slate
+         (web-only admin).
+         (commit bf1eef5)
+
+[01:05]  Refactored DASHBOARD ANALYTICS and improved SWR integration (live,
+         auto-refreshing data; fixed the data-loading issues).
+         (commit 81b77bf)
+
+[05:30]  Added the "support phone" field to Shop Settings.
+         (commit 1a7bdd0)
+
+[06:16]  Added TICKET MANAGEMENT and DRIVER RATINGS pages with full API
+         integration.
+         (commit 48e9f75)
+
+[08:27]  Refactored "product" naming to "item" naming across the order
+         components and related types (consistency cleanup).
+         (commit 0244ffa)
+
+[08:42]  Fixed tsconfig (baseUrl + include/exclude cleanup).
+         (commit e92f339)
+
+[09:13]  Implemented an AuthGate component for the admin area and a BrandLoader
+         for loading states (smoother, gated auth experience).
+         (commit 22c83a9)
+
+[09:21]  Pre-filled admin credentials in the Sign-In form for easier access.
+         (commit e881f5f)
+
+Net effect: the back office gained a working live dashboard, ticket/ratings
+management tied to the new driver features, a cleaner auth/loading flow, and
+naming/config cleanups.
+
+
+------------------------------------------------------------------------------
+3) MEETING
+------------------------------------------------------------------------------
+- Held a working meeting with Patrick.
+
+
+------------------------------------------------------------------------------
+4) AFROBOOST
+------------------------------------------------------------------------------
+- Built the Afroboost back office.
+
+
+------------------------------------------------------------------------------
+NOTES
+------------------------------------------------------------------------------
+- Commit times are local. Authorship: Mohamedbza.
+- Report generated from git history of the pops-villepinte (mobile) and
+  pops_superadmin (back office) repositories for 2026-05-30, plus manually
+  added items (Patrick meeting, Afroboost back office).
+==============================================================================

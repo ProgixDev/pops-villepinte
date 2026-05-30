@@ -143,6 +143,14 @@ export const menuApi = {
   getAccompagnements: () =>
     api<Accompagnement[]>("/accompagnements"),
   getShopSettings: () => api<ShopSettings>("/menu/shop-settings"),
+  getHomeContent: () => api<HomeContent>("/menu/home-content"),
+};
+
+export type HomeContent = {
+  marquee_text: string;
+  story_title: string;
+  story_body: string;
+  updated_at: string;
 };
 
 export const profileApi = {
