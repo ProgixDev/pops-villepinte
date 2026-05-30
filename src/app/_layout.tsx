@@ -1,7 +1,7 @@
 import "../../global.css";
 
 import { useEffect, useState } from "react";
-import { AppState, Platform } from "react-native";
+import { AppState, LogBox, Platform } from "react-native";
 import { Redirect, Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
@@ -35,6 +35,31 @@ import { useNotificationsStore } from "@/store/notifications.store";
 import { useProfileStore } from "@/store/profile.store";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// rnmapbox is pinned to 10.1.39 — a Paper/old-architecture-era release forced
+// by the precompiled nav SDK's MapboxMaps 11.11.0 dependency. RN 0.83 runs the
+// New Architecture (Fabric + TurboModules) with no old-arch fallback, so two
+// benign artifacts surface when <UserLocation> mounts on the driver map, and
+// neither is fixable at the source (upgrading rnmapbox is blocked by the
+// version lock):
+//   • "Unknown reactTag: N" — an internal rnmapbox native command racing
+//     Fabric's view registration at mount. Fires once; the map and puck work.
+//   • "getLastKnownLocation()Objective C type was unsupported" — a TurboModule
+//     return-type mismatch; rnmapbox catches it and falls back to live GPS.
+// Suppress only these two exact messages so real errors stay visible. Revisit
+// if the nav SDK ever allows a newer, New-Arch-clean @rnmapbox/maps.
+//
+// The third pattern silences RN's InteractionManager deprecation warning. We
+// use InteractionManager.runAfterInteractions deliberately on the driver map to
+// defer the native map mount past the tab transition (without it, mounting a
+// Fabric MapView mid-transition deadlocks the UI thread). requestIdleCallback
+// doesn't give the same "after the transition settles" guarantee, so we keep
+// InteractionManager on purpose and just mute the warning.
+LogBox.ignoreLogs([
+  /Unknown reactTag/,
+  /getLastKnownLocation/,
+  /InteractionManager has been deprecated/,
+]);
 
 export default function RootLayout(): React.ReactNode {
   const fontsLoaded = useAppFonts();

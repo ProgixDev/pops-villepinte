@@ -90,6 +90,15 @@ export default function DriverHomeScreen(): React.ReactElement {
     return () => task.cancel();
   }, []);
 
+  // The JS <Camera> ref attaches synchronously on commit, but the native map
+  // view isn't registered until Mapbox finishes loading the style. Dispatching
+  // an imperative camera command (setCamera/fitBounds) in that window sends a
+  // viewmanager command to a reactTag the native side doesn't know yet —
+  // "Unknown reactTag: N". Gate every auto-camera call on this flag, and add it
+  // to those effects' deps so they replay once the map is actually live (which
+  // also covers the case where `active` resolves before the map mounts).
+  const [mapLoaded, setMapLoaded] = useState(false);
+
   useEffect(() => {
     void fetchProfile();
     void fetchDeliveries();
@@ -130,6 +139,7 @@ export default function DriverHomeScreen(): React.ReactElement {
   // manual panning.
   const didInitialCenterRef = useRef(false);
   useEffect(() => {
+    if (!mapLoaded) return;
     if (didInitialCenterRef.current) return;
     if (!userCoords) return;
     didInitialCenterRef.current = true;
@@ -141,7 +151,7 @@ export default function DriverHomeScreen(): React.ReactElement {
       zoomLevel: 15.5,
       animationDuration: 600,
     });
-  }, [userCoords, active]);
+  }, [mapLoaded, userCoords, active]);
 
   // Frame the map on POP'S + the active dropoff (if any). Recomputes only
   // when the active dropoff coordinates change.
@@ -170,6 +180,7 @@ export default function DriverHomeScreen(): React.ReactElement {
   }, [active]);
 
   useEffect(() => {
+    if (!mapLoaded) return;
     if (cameraFit.bounds) {
       cameraRef.current?.fitBounds(
         cameraFit.bounds.ne,
@@ -184,7 +195,7 @@ export default function DriverHomeScreen(): React.ReactElement {
         animationDuration: 600,
       });
     }
-  }, [cameraFit]);
+  }, [mapLoaded, cameraFit]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -196,6 +207,7 @@ export default function DriverHomeScreen(): React.ReactElement {
           logoEnabled={false}
           attributionPosition={{ bottom: 8, left: 8 }}
           compassEnabled={false}
+          onDidFinishLoadingMap={() => setMapLoaded(true)}
         >
           <Camera
           ref={cameraRef}
@@ -208,6 +220,16 @@ export default function DriverHomeScreen(): React.ReactElement {
           <UserLocation
             visible
             androidRenderMode="normal"
+            // Snap the puck to each fix instead of animating between them.
+            // rnmapbox 10.1.39's smooth-move path wraps the coordinate in its
+            // own AnimatedPoint, which extends RN's AnimatedWithChildren but
+            // overwrites `_listeners` with a plain `{}`. RN 0.83 made
+            // `_listeners` a Map and calls `_listeners.forEach(...)`, so the
+            // object has no forEach → "this._listeners.forEach is not a
+            // function" thrown every animation frame. animated={false} skips
+            // that class entirely. With minDisplacement below, updates are
+            // sparse small hops, so snapping is barely noticeable.
+            animated={false}
             // Only push movement >= 10m up to JS. We just need the latest coord
             // for the recenter button, so a 1m threshold (a setState on every
             // GPS tick) is needless re-render churn.
