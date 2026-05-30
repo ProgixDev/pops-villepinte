@@ -1,3 +1,4 @@
+import { AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
 
@@ -38,4 +39,18 @@ export function setCurrentAccessToken(token: string | null): void {
 
 supabase.auth.onAuthStateChange((_event, session) => {
   currentAccessToken = session?.access_token ?? null;
+});
+
+// Keep the access token auto-refreshing while the app is foregrounded. On React
+// Native, supabase's refresh timer only runs when we drive it from AppState —
+// without this, a token can expire and never refresh, which surfaced as backend
+// "token is expired" 401s (REST) and dropped realtime subscriptions. We start
+// it now (the app launches active) and toggle on every AppState change.
+supabase.auth.startAutoRefresh();
+AppState.addEventListener("change", (state) => {
+  if (state === "active") {
+    void supabase.auth.startAutoRefresh();
+  } else {
+    void supabase.auth.stopAutoRefresh();
+  }
 });

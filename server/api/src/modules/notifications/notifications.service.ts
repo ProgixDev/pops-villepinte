@@ -67,16 +67,35 @@ export class NotificationsService {
       .insert(rows);
     if (insertError) throw insertError;
 
-    // Send pushes — fetch tokens for these users.
-    const { data: tokens } = await this.supabase
-      .from('device_tokens')
-      .select('token, user_id')
-      .in('user_id', userIds);
+    // Send pushes — fetch tokens for these users from BOTH stores:
+    //  - device_tokens: where customers register (one row per device)
+    //  - profiles.expo_push_token: where drivers register (one per driver)
+    // Drivers never write to device_tokens, so without this their assignment
+    // pushes silently never go out.
+    const [{ data: tokens }, { data: profileTokens }] = await Promise.all([
+      this.supabase
+        .from('device_tokens')
+        .select('token, user_id')
+        .in('user_id', userIds),
+      this.supabase
+        .from('profiles')
+        .select('expo_push_token')
+        .in('id', userIds)
+        .not('expo_push_token', 'is', null),
+    ]);
 
-    const validTokens =
-      (tokens ?? [])
-        .filter((t) => isExpoPushToken(t.token))
-        .map((t) => t.token);
+    const validTokens = Array.from(
+      new Set(
+        [
+          ...(tokens ?? []).map((t) => t.token),
+          ...(profileTokens ?? []).map(
+            (p) => p.expo_push_token as string | null,
+          ),
+        ].filter(
+          (tok): tok is string => !!tok && isExpoPushToken(tok),
+        ),
+      ),
+    );
 
     if (validTokens.length === 0) {
       return { recipients: userIds.length, pushed: 0 };
@@ -87,20 +106,29 @@ export class NotificationsService {
       title: payload.title,
       body: payload.body,
       sound: 'default' as const,
+      // payload.data spread LAST so an explicit data.kind (e.g.
+      // 'driver-assignment') and assignmentId survive — the tap handler in the
+      // app routes on data.kind, and notificationKind would otherwise clobber it.
       data: {
-        ...payload.data,
         kind: payload.notificationKind,
         orderId: payload.orderId,
+        ...payload.data,
       },
     }));
     const result = await sendExpoPush(messages);
 
-    // Prune tokens that Expo says are dead.
+    // Prune tokens that Expo says are dead — from both stores.
     if (result.invalidTokens.length > 0) {
-      await this.supabase
-        .from('device_tokens')
-        .delete()
-        .in('token', result.invalidTokens);
+      await Promise.all([
+        this.supabase
+          .from('device_tokens')
+          .delete()
+          .in('token', result.invalidTokens),
+        this.supabase
+          .from('profiles')
+          .update({ expo_push_token: null })
+          .in('expo_push_token', result.invalidTokens),
+      ]);
     }
 
     return {

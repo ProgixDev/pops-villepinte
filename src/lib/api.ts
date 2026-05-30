@@ -1,4 +1,8 @@
-import { getCurrentAccessToken, supabase } from "./supabase";
+import {
+  getCurrentAccessToken,
+  setCurrentAccessToken,
+  supabase,
+} from "./supabase";
 
 // Strip any trailing slash: joining a `.../api/v1/` base with a `/path` produces
 // a `//` URL that Vercel answers with a 308 redirect. iOS can't replay a POST
@@ -26,21 +30,44 @@ class ApiError extends Error {
   }
 }
 
+// Refresh if the access token is within this window of expiring (or already
+// expired). Supabase tokens live ~1h; refreshing a minute early avoids racing
+// the clock on a slow request.
+const EXPIRY_REFRESH_MARGIN_MS = 60_000;
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  // Prefer the in-memory mirror kept in sync via onAuthStateChange. It's
-  // populated synchronously by setSession()'s SIGNED_IN event, so requests
-  // fired right after signup get a bearer header even if
-  // supabase.auth.getSession()'s internal lock hasn't settled yet.
-  const mirrored = getCurrentAccessToken();
-  if (mirrored) {
-    return { Authorization: `Bearer ${mirrored}` };
+  // Read the persisted session and proactively refresh when the access token
+  // is expired / near expiry. The previous implementation returned the
+  // in-memory mirror UNCONDITIONALLY, which meant getSession()/refresh was
+  // never reached — so an expired token kept getting sent forever, producing
+  // the backend "token is expired" 401s. The mirror is now only a fallback for
+  // the brief window right after setSession() where getSession() can still
+  // resolve null.
+  let token: string | null = null;
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session) {
+      const expiresAtMs = (session.expires_at ?? 0) * 1000;
+      const nearExpiry =
+        expiresAtMs > 0 && expiresAtMs - Date.now() < EXPIRY_REFRESH_MARGIN_MS;
+      if (nearExpiry) {
+        const { data } = await supabase.auth.refreshSession();
+        token = data.session?.access_token ?? session.access_token ?? null;
+      } else {
+        token = session.access_token ?? null;
+      }
+    }
+  } catch {
+    token = null;
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.access_token) return {};
-  return { Authorization: `Bearer ${session.access_token}` };
+  if (!token) token = getCurrentAccessToken();
+  if (!token) return {};
+
+  setCurrentAccessToken(token);
+  return { Authorization: `Bearer ${token}` };
 }
 
 export async function api<T = unknown>(
@@ -60,16 +87,34 @@ export async function api<T = unknown>(
     if (qs) url += `?${qs}`;
   }
 
-  const headers: Record<string, string> = {
-    ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-    ...(await getAuthHeaders()),
+  const doFetch = async (): Promise<Response> => {
+    const headers: Record<string, string> = {
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(await getAuthHeaders()),
+    };
+    return fetch(url, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
   };
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let res = await doFetch();
+
+  // Safety net: a 401 usually means the access token expired between the
+  // header build and the server check (or the refresh token rotated). Force a
+  // single refresh and retry once before surfacing the error.
+  if (res.status === 401) {
+    try {
+      const { data } = await supabase.auth.refreshSession();
+      if (data.session?.access_token) {
+        setCurrentAccessToken(data.session.access_token);
+      }
+    } catch {
+      // Refresh failed (revoked / offline) — fall through to the error below.
+    }
+    res = await doFetch();
+  }
 
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({}));

@@ -31,7 +31,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 export default function RootLayout(): React.ReactNode {
   const fontsLoaded = useAppFonts();
   // Splash dismisses only when ALL conditions hold:
-  //   1. The animated splash component has finished its animation.
+  //   1. The logo video has finished (or errored / timed out).
   //   2. Zustand persist has finished hydrating from AsyncStorage.
   //   3. restoreSession() has resolved (sessionRestored === true).
   // The hydration gate is non-obvious but critical: AsyncStorage hydration is
@@ -184,9 +184,12 @@ export default function RootLayout(): React.ReactNode {
     const responseSub = Notifications.addNotificationResponseReceivedListener(
       (res) => {
         const data = res.notification.request.content.data as
-          | { orderId?: string; kind?: string }
+          | { orderId?: string; kind?: string; assignmentId?: string }
           | undefined;
-        if (data?.kind === "order" && data.orderId) {
+        if (data?.kind === "driver-assignment" && data.assignmentId) {
+          // New course for a driver → open the accept/refuse sheet directly.
+          router.push(`/driver/assignment/${data.assignmentId}` as never);
+        } else if (data?.kind === "order" && data.orderId) {
           router.push({
             pathname: "/order/[id]",
             params: { id: data.orderId },

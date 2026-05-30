@@ -66,6 +66,11 @@ export default function DriverHomeScreen(): React.ReactElement {
   // button is disabled while this is null.
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
 
+  // Only mount <UserLocation> once foreground permission is actually granted.
+  // Mounting it before permission resolves makes rnmapbox spin up the native
+  // location provider without authorization, which can crash on iOS.
+  const [locationGranted, setLocationGranted] = useState(false);
+
   // Defer mounting the native <MapView> until the screen-entry transition has
   // settled. Mounting a heavy Fabric native view (the map) on the JS thread
   // *while* React Navigation's native-driven "shift" tab transition is doing a
@@ -85,13 +90,15 @@ export default function DriverHomeScreen(): React.ReactElement {
     void fetchProfile();
     void fetchDeliveries();
     void fetchEarnings();
-    // Request foreground location permission up-front. rnmapbox's
-    // <UserLocation> would also trigger this implicitly when it tries to
-    // start its location provider, but doing it explicitly here gives a more
-    // deterministic prompt (some Android OEMs delay the implicit one until
-    // the map's location service spins up). If the user denies, the map
-    // still works — they just won't see the puck.
-    void Location.requestForegroundPermissionsAsync().catch(() => {});
+    // Request foreground location permission up-front, and only enable the
+    // <UserLocation> puck once it's actually granted. Doing the request here
+    // (rather than letting rnmapbox trigger it implicitly) gives a
+    // deterministic prompt and lets us hold off mounting the native location
+    // provider until we're authorized. If the user denies, the map still
+    // works — they just won't see the puck.
+    void Location.requestForegroundPermissionsAsync()
+      .then(({ status }) => setLocationGranted(status === "granted"))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -186,19 +193,20 @@ export default function DriverHomeScreen(): React.ReactElement {
             zoomLevel: 13,
           }}
         />
-        <UserLocation
-          visible
-          androidRenderMode="normal"
-          // Push every meter of movement up to JS. UserLocation pulls fresh
-          // fixes from the OS location provider continuously; we just want
-          // the latest coord for the recenter button + future "fit bounds
-          // including driver" enhancements.
-          minDisplacement={1}
-          onUpdate={(loc) => {
-            if (!loc?.coords) return;
-            setUserCoords([loc.coords.longitude, loc.coords.latitude]);
-          }}
-        />
+        {locationGranted ? (
+          <UserLocation
+            visible
+            androidRenderMode="normal"
+            // Only push movement >= 10m up to JS. We just need the latest coord
+            // for the recenter button, so a 1m threshold (a setState on every
+            // GPS tick) is needless re-render churn.
+            minDisplacement={10}
+            onUpdate={(loc) => {
+              if (!loc?.coords) return;
+              setUserCoords([loc.coords.longitude, loc.coords.latitude]);
+            }}
+          />
+        ) : null}
 
         <MarkerView
           coordinate={POPS_COORDS}

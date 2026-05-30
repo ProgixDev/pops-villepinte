@@ -52,6 +52,19 @@ export async function sendExpoPush(
   const tickets: ExpoTicket[] = [];
 
   for (const chunk of chunks) {
+    // Default every message to high priority + the HIGH-importance 'default'
+    // Android channel the apps register (see lib/push.ts). Without high priority,
+    // Android holds notifications in Doze while the phone is locked/idle and only
+    // flushes them at the next maintenance window — minutes later, or never until
+    // the screen turns on. That was the "driver gets the course a minute late, or
+    // only sees the in-app notif because the phone was closed" bug. channelId
+    // selects the heads-up + sound channel on Android 8+. Per-message values still
+    // win (spread last) for any future caller that wants different behavior.
+    const payload: ExpoPushMessage[] = chunk.map((m) => ({
+      priority: 'high',
+      channelId: 'default',
+      ...m,
+    }));
     try {
       const res = await fetch(EXPO_PUSH_URL, {
         method: 'POST',
@@ -60,7 +73,7 @@ export async function sendExpoPush(
           'accept-encoding': 'gzip, deflate',
           'content-type': 'application/json',
         },
-        body: JSON.stringify(chunk),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) continue;
       const body = (await res.json()) as { data?: ExpoTicket | ExpoTicket[] };
