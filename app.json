@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.progix.popsvillepinte",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -19,7 +19,7 @@
     "android": {
       "package": "com.progix.popsvillepinte",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 10,
+      "versionCode": 11,
       "adaptiveIcon": {
         "backgroundColor": "#FFCE00",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -64,7 +64,7 @@
       [
         "@rnmapbox/maps",
         {
-          "RNMapboxMapsVersion": "11.20.1"
+          "RNMapboxMapsVersion": "11.11.0"
         }
       ],
       [
