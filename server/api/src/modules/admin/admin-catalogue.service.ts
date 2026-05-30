@@ -423,7 +423,7 @@ export class AdminCatalogueService {
 
   // Shop settings (single-row table, id=1)
   private static readonly SHOP_SELECT =
-    'open_days, open_hours, hours_by_day, delivery_base_fee_eur, delivery_per_km_eur, updated_at';
+    'open_days, open_hours, hours_by_day, delivery_base_fee_eur, delivery_per_km_eur, support_phone, updated_at';
 
   async getShopSettings() {
     const { data, error } = await this.supabase
@@ -448,6 +448,10 @@ export class AdminCatalogueService {
     }
     if (dto.delivery_per_km_eur !== undefined) {
       patch.delivery_per_km_eur = dto.delivery_per_km_eur;
+    }
+    if (dto.support_phone !== undefined) {
+      // Empty string clears it back to null so the driver app hides the button.
+      patch.support_phone = dto.support_phone.trim() || null;
     }
 
     const { data, error } = await this.supabase

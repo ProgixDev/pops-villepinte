@@ -16,17 +16,14 @@ type DeliveriesState = {
     status: "accepted" | "refused",
     note?: string,
   ) => Promise<void>;
-  markPickedUp: (id: string) => Promise<void>;
   markDelivered: (id: string) => Promise<void>;
 };
 
 function activeIdFromList(items: Delivery[]): string | null {
   // "Active" is the one currently in flight from the driver's POV — accepted
-  // (en route to pickup) or picked_up (en route to drop-off). Picks the most
-  // recently assigned one if there's somehow more than one.
-  const inflight = items.filter(
-    (d) => d.status === "accepted" || d.status === "picked_up",
-  );
+  // means they've taken the food and are en route to the customer. Picks the
+  // most recently assigned one if there's somehow more than one.
+  const inflight = items.filter((d) => d.status === "accepted");
   return inflight[0]?.id ?? null;
 }
 
@@ -70,12 +67,6 @@ export const useDeliveriesStore = create<DeliveriesState>()((set, get) => ({
       const nextActive = activeIdFromList(Object.values(nextById));
       return { byId: nextById, activeId: nextActive };
     });
-  },
-
-  markPickedUp: async (id) => {
-    const updated = await driverApi.pickedUp(id);
-    const mapped = mapAssignmentToDelivery(updated);
-    set((s) => ({ byId: { ...s.byId, [id]: mapped }, activeId: id }));
   },
 
   markDelivered: async (id) => {

@@ -362,6 +362,8 @@ export type ShopSettings = {
   hours_by_day?: Partial<Record<DayKey, DayHours>>;
   delivery_base_fee_eur?: number;
   delivery_per_km_eur?: number;
+  /** Superadmin support line surfaced to drivers ("Appeler le support"). */
+  support_phone?: string | null;
   updated_at: string;
 };
 

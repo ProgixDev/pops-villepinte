@@ -63,4 +63,8 @@ create policy driver_locations_admin_all on public.driver_locations
 -- via postgres_changes. The replication filter still respects RLS, so the
 -- customer only receives events for the driver they're authorized to see.
 
-alter publication supabase_realtime add table public.driver_locations;
+-- Idempotent: re-running on a DB where the table is already published would
+-- otherwise fail with 42710 (already a member of the publication).
+do $$ begin
+  alter publication supabase_realtime add table public.driver_locations;
+exception when duplicate_object then null; end $$;

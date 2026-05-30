@@ -4,4 +4,8 @@
 -- (order_assignments_driver_select) already restricts inbound rows to the
 -- assigned driver (auth.uid() = driver_id) or admins, so realtime delivery is
 -- scoped automatically.
-alter publication supabase_realtime add table public.order_assignments;
+-- Idempotent: re-running on a DB where the table is already published would
+-- otherwise fail with 42710 (already a member of the publication).
+do $$ begin
+  alter publication supabase_realtime add table public.order_assignments;
+exception when duplicate_object then null; end $$;

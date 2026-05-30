@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   Text,
@@ -9,10 +10,12 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Bike, Check, ChevronLeft, X } from "lucide-react-native";
+import { Bike, Check, ChevronLeft, LifeBuoy, X } from "lucide-react-native";
 
 import { colors, font, radius } from "@/constants/theme";
 import { driverApi, type DriverAssignment } from "@/lib/api";
+import { useDeliveriesStore } from "@/store/driver/deliveries.store";
+import { useMenuStore } from "@/store/menu.store";
 
 export default function DriverAssignmentScreen(): React.ReactElement {
   const router = useRouter();
@@ -25,6 +28,14 @@ export default function DriverAssignmentScreen(): React.ReactElement {
   const [responding, setResponding] = useState<"accepted" | "refused" | null>(
     null,
   );
+
+  // Superadmin support line (configured in the admin dashboard). Lets the
+  // driver reach the superadmin directly if they're not around.
+  const supportPhone = useMenuStore((s) => s.shopSettings?.support_phone);
+  const callSupport = useCallback(() => {
+    if (!supportPhone) return;
+    Linking.openURL(`tel:${supportPhone.replace(/\s+/g, "")}`).catch(() => {});
+  }, [supportPhone]);
 
   useEffect(() => {
     if (!id) return;
@@ -57,11 +68,16 @@ export default function DriverAssignmentScreen(): React.ReactElement {
         setResponding(status);
         const updated = await driverApi.respond(id, status, note);
         setAssignment(updated);
+        if (status === "accepted") {
+          // Load this course into the deliveries store, then jump straight into
+          // turn-by-turn navigation to the customer.
+          void useDeliveriesStore.getState().fetch();
+          router.replace(`/driver/navigate/${id}` as never);
+          return;
+        }
         Alert.alert(
-          status === "accepted" ? "Course acceptée" : "Course refusée",
-          status === "accepted"
-            ? "On a prévenu le restaurant que tu arrives."
-            : "Le restaurant va réassigner la commande.",
+          "Course refusée",
+          "Le restaurant va réassigner la commande.",
           [{ text: "OK", onPress: () => router.back() }],
         );
       } catch (e) {
@@ -234,6 +250,37 @@ export default function DriverAssignmentScreen(): React.ReactElement {
               }}
             />
           </Card>
+        ) : null}
+
+        {supportPhone ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Appeler le support"
+            onPress={callSupport}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              paddingVertical: 14,
+              borderRadius: radius.lg,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+            }}
+          >
+            <LifeBuoy size={16} color={colors.ink} strokeWidth={2.5} />
+            <Text
+              style={{
+                fontFamily: font.bodyBold,
+                fontSize: 13,
+                letterSpacing: 1,
+                color: colors.ink,
+              }}
+            >
+              APPELER LE SUPPORT
+            </Text>
+          </Pressable>
         ) : null}
       </ScrollView>
 

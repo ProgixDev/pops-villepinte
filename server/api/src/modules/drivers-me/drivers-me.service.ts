@@ -128,17 +128,39 @@ export class DriversMeService {
         `Assignment is already "${current.status}"`,
       );
     }
+
+    // Accepting collapses the old separate "picked up" step. The driver is
+    // parked at the restaurant, so accepting the course IS taking the food: we
+    // stamp picked_up_at now and advance the order to handed_to_livreur, which
+    // fires the customer "Avec le livreur 🛵" push — no extra tap required.
+    const now = new Date().toISOString();
     const { data, error } = await this.supabase
       .from('order_assignments')
       .update({
         status,
         note: note?.trim() || null,
-        responded_at: new Date().toISOString(),
+        responded_at: now,
+        picked_up_at: status === 'accepted' ? now : null,
       })
       .eq('id', assignmentId)
       .select(ASSIGNMENT_SELECT)
       .single();
     if (error) throw error;
+
+    if (status === 'accepted' && current.order_id) {
+      // Best-effort: if the order isn't 'ready' yet (rare — admin normally
+      // assigns ready orders), skip silently. markDelivered reconciles the
+      // order status at the end, so the lifecycle still completes.
+      try {
+        await this.orders.advanceOrderStatus(
+          current.order_id,
+          'handed_to_livreur',
+        );
+      } catch {
+        /* order not ready yet — no push now, reconciled at delivery */
+      }
+    }
+
     return data;
   }
 
@@ -178,11 +200,6 @@ export class DriversMeService {
         'Cette course n\'est pas en cours de livraison.',
       );
     }
-    if (!current.picked_up_at) {
-      throw new BadRequestException(
-        'Confirme d\'abord la prise en main de la commande.',
-      );
-    }
     if (current.delivered_at) {
       throw new BadRequestException('Cette course est déjà livrée.');
     }
@@ -190,9 +207,21 @@ export class DriversMeService {
       throw new BadRequestException('Commande liée introuvable.');
     }
 
+    // Walk the order to the terminal 'picked_up' state. It's normally already
+    // at handed_to_livreur (advanced when the driver accepted); the
+    // ready→handed_to_livreur hop below is a no-op reconciliation for the edge
+    // where the order only became ready after acceptance.
+    try {
+      await this.orders.advanceOrderStatus(
+        current.order_id,
+        'handed_to_livreur',
+      );
+    } catch {
+      /* already past 'ready' — expected in the normal flow */
+    }
     // Bumps orders.status: handed_to_livreur → picked_up (the terminal
-    // "completed" state for both pickup and delivery). Fires the customer
-    // push ("Bon app'! 💛 · Livraison confirmée").
+    // "completed" state). Fires the customer push ("Bon app'! 💛 · Livraison
+    // confirmée").
     await this.orders.advanceOrderStatus(current.order_id, 'picked_up');
 
     const { data, error } = await this.supabase

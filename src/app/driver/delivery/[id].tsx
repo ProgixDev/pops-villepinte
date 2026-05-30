@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Navigation, Phone } from "lucide-react-native";
+import { ArrowLeft, LifeBuoy, Navigation, Phone } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
 import DeliveryStatusPill from "@/components/driver/delivery/DeliveryStatusPill";
@@ -16,13 +16,13 @@ import {
 } from "@/lib/format";
 import { useDeliveriesStore } from "@/store/driver/deliveries.store";
 import { useEarningsStore } from "@/store/driver/earnings.store";
+import { useMenuStore } from "@/store/menu.store";
 import { useDriverLocationBroadcast } from "@/lib/driver/useDriverLocationBroadcast";
 import type { DeliveryStatus } from "@/types/driver";
 
 const NEXT_LABEL: Partial<Record<DeliveryStatus, string>> = {
   assigned: "Accepter la course",
   accepted: "Lancer la navigation",
-  picked_up: "Lancer la navigation",
 };
 
 export default function DriverDeliveryDetailScreen(): React.ReactElement {
@@ -30,18 +30,20 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
   const router = useRouter();
   const delivery = useDeliveriesStore((s) => (id ? s.byId[id] : undefined));
   const respond = useDeliveriesStore((s) => s.respond);
-  const markPickedUp = useDeliveriesStore((s) => s.markPickedUp);
   const markDelivered = useDeliveriesStore((s) => s.markDelivered);
   const fetchDeliveries = useDeliveriesStore((s) => s.fetch);
   const refreshEarnings = useEarningsStore((s) => s.fetchAll);
+  // Superadmin support line (configured in the admin dashboard). The call tile
+  // only renders when one is set.
+  const supportPhone = useMenuStore((s) => s.shopSettings?.support_phone);
 
   const [busy, setBusy] = useState(false);
 
-  // Broadcast driver location while this delivery is in the picked-up state
-  // (driver has the food and is en route to the customer). The hook handles
-  // permission + watchPositionAsync + upsert internally; we just gate it on
-  // the right phase of the lifecycle.
-  useDriverLocationBroadcast({ active: delivery?.status === "picked_up" });
+  // Broadcast driver location while the delivery is accepted (driver has taken
+  // the food at the restaurant and is en route to the customer). The hook
+  // handles permission + watchPositionAsync + upsert internally; we just gate
+  // it on the lifecycle phase.
+  useDriverLocationBroadcast({ active: delivery?.status === "accepted" });
 
   useEffect(() => {
     // If the store hasn't loaded this assignment yet (e.g. opened via deep
@@ -76,6 +78,11 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
     ).catch(() => {});
   };
 
+  const callSupport = (): void => {
+    if (!supportPhone) return;
+    Linking.openURL(`tel:${supportPhone.replace(/\s+/g, "")}`).catch(() => {});
+  };
+
   const launchNavigation = (): void => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     router.push(`/driver/navigate/${delivery.id}` as never);
@@ -90,6 +97,8 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
         Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success,
         ).catch(() => {});
+        // Accept = took the food → go straight into turn-by-turn navigation.
+        launchNavigation();
       } catch (e) {
         Alert.alert("Erreur", e instanceof Error ? e.message : "Erreur réseau");
       } finally {
@@ -97,23 +106,8 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
       }
       return;
     }
-    if (delivery.status === "accepted" || delivery.status === "picked_up") {
+    if (delivery.status === "accepted") {
       launchNavigation();
-    }
-  };
-
-  const onPickedUp = async (): Promise<void> => {
-    if (busy) return;
-    try {
-      setBusy(true);
-      await markPickedUp(delivery.id);
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success,
-      ).catch(() => {});
-    } catch (e) {
-      Alert.alert("Erreur", e instanceof Error ? e.message : "Erreur réseau");
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -135,8 +129,7 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
   };
 
   const primaryLabel = NEXT_LABEL[delivery.status];
-  const showPickedUpBtn = delivery.status === "accepted";
-  const showDeliveredBtn = delivery.status === "picked_up";
+  const showDeliveredBtn = delivery.status === "accepted";
 
   return (
     <Screen
@@ -154,13 +147,6 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
         >
           {primaryLabel !== undefined ? (
             <PrimaryButton label={primaryLabel} onPress={onPrimary} busy={busy} />
-          ) : null}
-          {showPickedUpBtn ? (
-            <SecondaryButton
-              label="J'ai récupéré la commande"
-              onPress={onPickedUp}
-              busy={busy}
-            />
           ) : null}
           {showDeliveredBtn ? (
             <PrimaryButton
@@ -362,6 +348,13 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
           label="Navigation"
           onPress={launchNavigation}
         />
+        {supportPhone ? (
+          <ActionTile
+            icon={<LifeBuoy size={18} color={colors.ink} strokeWidth={2.5} />}
+            label="Support"
+            onPress={callSupport}
+          />
+        ) : null}
       </View>
     </Screen>
   );
@@ -411,47 +404,6 @@ function PrimaryButton({
           {label}
         </Text>
       )}
-    </Pressable>
-  );
-}
-
-function SecondaryButton({
-  label,
-  onPress,
-  busy,
-}: {
-  label: string;
-  onPress: () => void;
-  busy?: boolean;
-}): React.ReactElement {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={busy ? undefined : onPress}
-      disabled={busy}
-      style={({ pressed }) => ({
-        backgroundColor: colors.surface,
-        borderRadius: 16,
-        paddingVertical: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1.5,
-        borderColor: colors.ink,
-        opacity: pressed || busy ? 0.7 : 1,
-      })}
-    >
-      <Text
-        style={{
-          fontFamily: "Poppins_700Bold",
-          fontSize: 13,
-          letterSpacing: 2,
-          color: colors.ink,
-          textTransform: "uppercase",
-        }}
-      >
-        {label}
-      </Text>
     </Pressable>
   );
 }

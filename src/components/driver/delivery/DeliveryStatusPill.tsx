@@ -18,8 +18,7 @@ type PillConfig = {
 
 const CONFIG: Record<DeliveryStatus, PillConfig> = {
   assigned: { label: "Nouvelle", bg: colors.primary, text: colors.ink },
-  accepted: { label: "Vers le resto", bg: colors.border, text: colors.inkMuted },
-  picked_up: { label: "En route", bg: colors.ink, text: colors.surface },
+  accepted: { label: "En route", bg: colors.ink, text: colors.surface },
   delivered: { label: "Livrée", bg: colors.success, text: colors.surface },
   cancelled: { label: "Annulée", bg: colors.error, text: colors.surface },
 };

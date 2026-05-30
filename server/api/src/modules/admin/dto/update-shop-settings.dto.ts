@@ -65,4 +65,10 @@ export class UpdateShopSettingsDto {
   @IsNumber()
   @Min(0)
   delivery_per_km_eur?: number;
+
+  // Superadmin support phone surfaced to drivers. Empty string clears it.
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  support_phone?: string;
 }

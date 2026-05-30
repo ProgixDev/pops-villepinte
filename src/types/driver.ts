@@ -4,8 +4,7 @@ export type LngLat = readonly [number, number]; // [lng, lat]
 // delivered_at via mapAssignment().
 export type DeliveryStatus =
   | "assigned" // assigned to driver, not yet accepted
-  | "accepted" // driver accepted, on the way to pickup
-  | "picked_up" // order picked up at restaurant, en route to customer
+  | "accepted" // driver accepted (= took the food, parked at the restaurant) and is en route to the customer
   | "delivered"
   | "cancelled";
 

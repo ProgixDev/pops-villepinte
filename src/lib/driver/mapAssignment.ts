@@ -21,9 +21,9 @@ function shortCodeFromOrderId(orderId: string): string {
 function deriveStatus(a: DriverAssignment): DeliveryStatus {
   if (a.status === "refused" || a.status === "cancelled") return "cancelled";
   if (a.status === "pending") return "assigned";
-  // accepted
+  // accepted — the driver is parked at the restaurant, so accepting already
+  // means en route to the customer. There's no separate "picked up" state.
   if (a.delivered_at) return "delivered";
-  if (a.picked_up_at) return "picked_up";
   return "accepted";
 }
 
