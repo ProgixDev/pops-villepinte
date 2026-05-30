@@ -479,6 +479,7 @@ export class OrdersService {
     orderId: string,
     category: string,
     description?: string,
+    imageUrls?: string[],
   ) {
     // Ownership check (throws 404 if the order isn't the caller's).
     await this.getCustomerOrderById(userId, orderId);
@@ -498,6 +499,7 @@ export class OrdersService {
         reporter_role: 'customer',
         category,
         description: description?.trim() || null,
+        image_urls: imageUrls ?? [],
       })
       .select()
       .single();

@@ -1,18 +1,22 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X } from "lucide-react-native";
+import { ImagePlus, X } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 
 import { colors, shadow } from "@/constants/theme";
 import { ordersApi } from "@/lib/api";
+import { uploadTicketImages } from "@/lib/uploads";
 
 const CATEGORIES = [
   "Commande incomplète",
@@ -21,6 +25,8 @@ const CATEGORIES = [
   "Retard important",
   "Autre",
 ];
+
+const MAX_IMAGES = 5;
 
 export default function ReportProblemSheet({
   visible,
@@ -34,21 +40,48 @@ export default function ReportProblemSheet({
   const insets = useSafeAreaInsets();
   const [category, setCategory] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const pickImages = async (): Promise<void> => {
+    if (busy || images.length >= MAX_IMAGES) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_IMAGES - images.length,
+      quality: 0.6,
+      base64: true,
+    });
+    if (result.canceled) return;
+    setImages((prev) => [...prev, ...result.assets].slice(0, MAX_IMAGES));
+  };
+
+  const removeImage = (uri: string): void => {
+    setImages((prev) => prev.filter((a) => a.uri !== uri));
+  };
 
   const submit = async (): Promise<void> => {
     if (!category || busy) return;
     try {
       setBusy(true);
+      setError(null);
+      const imageUrls =
+        images.length > 0 ? await uploadTicketImages(images) : undefined;
       await ordersApi.report(orderId, {
         category,
         description: description.trim() || undefined,
+        imageUrls,
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSent(true);
-    } catch {
-      // keep open for retry
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Envoi impossible — vérifie ta connexion et réessaie.",
+      );
     } finally {
       setBusy(false);
     }
@@ -57,7 +90,9 @@ export default function ReportProblemSheet({
   const close = (): void => {
     setCategory(null);
     setDescription("");
+    setImages([]);
     setSent(false);
+    setError(null);
     onClose();
   };
 
@@ -165,6 +200,101 @@ export default function ReportProblemSheet({
                   textAlignVertical: "top",
                 }}
               />
+
+              {/* Photo attachments */}
+              <View
+                style={{
+                  marginTop: 16,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Poppins_600SemiBold",
+                    fontSize: 13,
+                    color: colors.ink,
+                  }}
+                >
+                  Photos {images.length > 0 ? `(${images.length}/${MAX_IMAGES})` : "(optionnel)"}
+                </Text>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginTop: 10 }}
+                contentContainerStyle={{ gap: 10 }}
+              >
+                {images.map((asset) => (
+                  <View key={asset.uri} style={{ position: "relative" }}>
+                    <Image
+                      source={{ uri: asset.uri }}
+                      style={{
+                        width: 76,
+                        height: 76,
+                        borderRadius: 14,
+                        backgroundColor: colors.background,
+                      }}
+                    />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Retirer la photo"
+                      onPress={() => removeImage(asset.uri)}
+                      hitSlop={8}
+                      style={{
+                        position: "absolute",
+                        top: -6,
+                        right: -6,
+                        width: 24,
+                        height: 24,
+                        borderRadius: 12,
+                        backgroundColor: colors.ink,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <X size={14} color={colors.surface} strokeWidth={3} />
+                    </Pressable>
+                  </View>
+                ))}
+
+                {images.length < MAX_IMAGES ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Ajouter des photos"
+                    onPress={() => void pickImages()}
+                    disabled={busy}
+                    style={{
+                      width: 76,
+                      height: 76,
+                      borderRadius: 14,
+                      borderWidth: 1.5,
+                      borderColor: colors.border,
+                      borderStyle: "dashed",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: colors.background,
+                    }}
+                  >
+                    <ImagePlus size={24} color={colors.inkMuted} strokeWidth={2} />
+                  </Pressable>
+                ) : null}
+              </ScrollView>
+
+              {error ? (
+                <Text
+                  style={{
+                    marginTop: 12,
+                    fontFamily: "Poppins_500Medium",
+                    fontSize: 12,
+                    color: "#dc2626",
+                  }}
+                >
+                  {error}
+                </Text>
+              ) : null}
 
               <Pressable
                 accessibilityRole="button"

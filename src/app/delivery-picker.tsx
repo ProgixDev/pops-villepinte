@@ -49,6 +49,7 @@ import {
   type DeliveryAddress,
 } from "@/lib/delivery";
 import { useMenuStore } from "@/store/menu.store";
+import { ensureLocationPermission } from "@/lib/location";
 import {
   MAPBOX_STYLE_STREETS,
   initMapbox,
@@ -106,6 +107,21 @@ export default function DeliveryPickerScreen(): React.ReactElement {
   const [suggestions, setSuggestions] = useState<DeliveryAddress[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // The Mapbox LocationPuck must only be mounted once foreground location
+  // permission is granted — rendering it while the status is still undetermined
+  // crashes the iOS Mapbox SDK. We resolve the permission on mount; it's
+  // usually already granted because the home screen requested it after sign-in.
+  const [locationGranted, setLocationGranted] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void ensureLocationPermission().then((granted) => {
+      if (!cancelled) setLocationGranted(granted);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Selection is "fresh" when the on-screen pin coincides with the locked
   // selectedSpot. Tolerance is generous so float drift from Mapbox's idle
@@ -253,8 +269,9 @@ export default function DeliveryPickerScreen(): React.ReactElement {
   const handleRecenterOnMe = async () => {
     try {
       void Haptics.selectionAsync();
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
+      const granted = await ensureLocationPermission();
+      setLocationGranted(granted);
+      if (!granted) return;
       // First fix right after the grant can throw on a cold GPS provider —
       // fall back to the last-known fix so the user doesn't need to restart.
       let pos: Location.LocationObject | null = null;
@@ -357,7 +374,9 @@ export default function DeliveryPickerScreen(): React.ReactElement {
             zoomLevel: 15,
           }}
         />
-        <LocationPuck visible pulsing={{ isEnabled: true }} />
+        {locationGranted ? (
+          <LocationPuck visible pulsing={{ isEnabled: true }} />
+        ) : null}
       </MapView>
 
       {/* Fixed centre pin */}

@@ -30,6 +30,7 @@ import { ROUTES } from "@/constants/routes";
 import { colors, font, radius } from "@/constants/theme";
 import { useDeferredMount } from "@/hooks/useDeferredMount";
 import { formatPriceEUR } from "@/lib/format";
+import { requestLocationOncePerSession } from "@/lib/location";
 import { useMenuStore } from "@/store/menu.store";
 import { useNotificationsStore } from "@/store/notifications.store";
 import { useProfileStore } from "@/store/profile.store";
@@ -360,6 +361,13 @@ export default function AccueilScreen(): React.ReactElement {
   useEffect(() => {
     if (PRODUCTS.length === 0) void fetchMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Ask for GPS access once, right after the customer lands on the home screen
+  // (i.e. post sign-in). Doing it here means the address picker later opens with
+  // permission already resolved — never prompting (and never crashing) mid-map.
+  useEffect(() => {
+    void requestLocationOncePerSession();
   }, []);
 
   const heroProducts = useMemo<Product[]>(() => {

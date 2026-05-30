@@ -62,6 +62,12 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "POP'S accède à tes photos pour joindre des images à un signalement."
+        }
+      ],
+      [
         "@rnmapbox/maps",
         {
           "RNMapboxMapsVersion": "11.11.0"

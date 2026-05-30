@@ -220,9 +220,12 @@ export const ordersApi = {
   // Customer rates the driver after delivery (1..5 stars + optional feedback).
   rate: (id: string, body: { stars: number; feedback?: string }) =>
     api<{ id: string }>(`/orders/${id}/rating`, { method: "POST", body }),
-  // Customer files a problem ticket about their order/delivery.
-  report: (id: string, body: { category: string; description?: string }) =>
-    api<{ id: string }>(`/orders/${id}/report`, { method: "POST", body }),
+  // Customer files a problem ticket about their order/delivery. `imageUrls` are
+  // public URLs already uploaded to the ticket-attachments bucket.
+  report: (
+    id: string,
+    body: { category: string; description?: string; imageUrls?: string[] },
+  ) => api<{ id: string }>(`/orders/${id}/report`, { method: "POST", body }),
 };
 
 // ─── Driver API ──────────────────────────────────────────────────────

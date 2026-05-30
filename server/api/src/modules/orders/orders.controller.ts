@@ -74,6 +74,7 @@ export class OrdersController {
       id,
       dto.category,
       dto.description,
+      dto.imageUrls,
     );
   }
 }
