@@ -12,8 +12,10 @@ import { CurrentUser, AuthUser } from '../../common/decorators/current-user.deco
 import { DriverGuard } from '../../common/guards/driver.guard';
 import { AssignmentsQueryDto } from './dto/assignments-query.dto';
 import { EarningsQueryDto } from './dto/earnings-query.dto';
+import { MarkDeliveredDto } from './dto/mark-delivered.dto';
 import { OnlineStatusDto } from './dto/online-status.dto';
 import { PushTokenDto } from './dto/push-token.dto';
+import { ReportProblemDto } from './dto/report-problem.dto';
 import { RespondAssignmentDto } from './dto/respond-assignment.dto';
 import { DriversMeService } from './drivers-me.service';
 
@@ -65,8 +67,24 @@ export class DriversMeController {
   }
 
   @Patch('assignments/:id/delivered')
-  delivered(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.svc.markDelivered(user.id, id);
+  delivered(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: MarkDeliveredDto,
+  ) {
+    return this.svc.markDelivered(user.id, id, {
+      method: dto.method,
+      code: dto.code,
+    });
+  }
+
+  @Post('assignments/:id/report')
+  report(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ReportProblemDto,
+  ) {
+    return this.svc.reportProblem(user.id, id, dto.category, dto.description);
   }
 
   @Get('earnings')

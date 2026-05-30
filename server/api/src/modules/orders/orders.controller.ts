@@ -3,6 +3,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CustomerOrdersQueryDto } from './dto/orders-query.dto';
+import { RateDriverDto } from './dto/rate-driver.dto';
+import { ReportProblemDto } from './dto/report-problem.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -48,5 +50,30 @@ export class OrdersController {
     @Param('id') id: string,
   ) {
     return this.ordersService.confirmCustomerPickedUp(user.id, id);
+  }
+
+  // Customer rates the driver after delivery.
+  @Post(':id/rating')
+  rateDriver(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: RateDriverDto,
+  ) {
+    return this.ordersService.rateDriver(user.id, id, dto.stars, dto.feedback);
+  }
+
+  // Customer files a problem ticket about their order/delivery.
+  @Post(':id/report')
+  reportProblem(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: ReportProblemDto,
+  ) {
+    return this.ordersService.reportCustomerProblem(
+      user.id,
+      id,
+      dto.category,
+      dto.description,
+    );
   }
 }

@@ -16,7 +16,14 @@ type DeliveriesState = {
     status: "accepted" | "refused",
     note?: string,
   ) => Promise<void>;
-  markDelivered: (id: string) => Promise<void>;
+  markDelivered: (
+    id: string,
+    payload: { method: "qr" | "manual"; code?: string },
+  ) => Promise<void>;
+  reportProblem: (
+    id: string,
+    payload: { category: string; description?: string },
+  ) => Promise<void>;
 };
 
 function activeIdFromList(items: Delivery[]): string | null {
@@ -69,8 +76,8 @@ export const useDeliveriesStore = create<DeliveriesState>()((set, get) => ({
     });
   },
 
-  markDelivered: async (id) => {
-    const updated = await driverApi.delivered(id);
+  markDelivered: async (id, payload) => {
+    const updated = await driverApi.delivered(id, payload);
     const mapped = mapAssignmentToDelivery(updated);
     set((s) => {
       const next = { ...s.byId, [id]: mapped };
@@ -79,6 +86,13 @@ export const useDeliveriesStore = create<DeliveriesState>()((set, get) => ({
         activeId: s.activeId === id ? null : s.activeId,
       };
     });
+  },
+
+  reportProblem: async (id, payload) => {
+    await driverApi.reportProblem(id, payload);
+    // The course stays undelivered; refresh so any server-side change (e.g. an
+    // admin reassigning it) shows up.
+    await get().fetch();
   },
 }));
 

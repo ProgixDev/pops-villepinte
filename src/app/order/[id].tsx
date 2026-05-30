@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
@@ -13,7 +13,10 @@ import Animated, {
 import IconButton from "@/components/common/IconButton";
 import Toast from "@/components/common/Toast";
 import CountdownRing from "@/components/order/CountdownRing";
+import DriverHandoffQR from "@/components/order/DriverHandoffQR";
 import LiveDriverMap from "@/components/order/LiveDriverMap";
+import RateDriverCard from "@/components/order/RateDriverCard";
+import ReportProblemSheet from "@/components/order/ReportProblemSheet";
 import OrderStatusPill from "@/components/order/OrderStatusPill";
 import OrderTimeline from "@/components/order/OrderTimeline";
 import PickupInstructions from "@/components/order/PickupInstructions";
@@ -47,6 +50,7 @@ export default function OrderDetailScreen(): React.ReactElement {
   const [toastMessage, setToastMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const countdown = useCountdown(
     order?.createdAt ?? new Date().toISOString(),
@@ -146,10 +150,13 @@ export default function OrderDetailScreen(): React.ReactElement {
   //                   livreur has handed off the bag
   const showPickupCta =
     !isDelivery && !isTerminal && (isPreparing || isReady);
-  const showDeliveryCta =
-    isDelivery && !isTerminal && (isPreparing || isHandedToLivreur);
+  // Delivery completion is now driver-QR-driven (the driver scans the
+  // customer's QR), so there's no customer self-confirm for delivery. The only
+  // delivery CTA is the friendly "Je suis prêt à recevoir" ping while cooking.
+  const showDeliveryCta = isDelivery && !isTerminal && isPreparing;
   const showCta = showPickupCta || showDeliveryCta;
-  const canConfirmReceipt = isDelivery ? isHandedToLivreur : isReady;
+  const canConfirmReceipt = isDelivery ? false : isReady;
+  const isDelivered = order.status === ORDER_STATUS.PICKED_UP;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
@@ -221,6 +228,11 @@ export default function OrderDetailScreen(): React.ReactElement {
           />
         ) : null}
 
+        {/* QR handoff — the driver scans this to confirm the delivery. */}
+        {isDelivery && isHandedToLivreur && order.deliveryCode ? (
+          <DriverHandoffQR code={order.deliveryCode} />
+        ) : null}
+
         {/* Timeline */}
         <OrderTimeline status={order.status} pickupMode={order.pickupMode} />
 
@@ -228,6 +240,40 @@ export default function OrderDetailScreen(): React.ReactElement {
         <View style={{ marginTop: 8 }}>
           <PickupInstructions orderId={order.id} />
         </View>
+
+        {/* Post-delivery: rate the driver. */}
+        {isDelivery && isDelivered ? (
+          <RateDriverCard
+            orderId={order.id}
+            initialStars={order.driverRating?.stars}
+            initialFeedback={order.driverRating?.feedback}
+          />
+        ) : null}
+
+        {/* Report a problem — available once the driver is en route or done. */}
+        {isDelivery && (isHandedToLivreur || isDelivered) ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setReportOpen(true)}
+            style={{
+              marginHorizontal: 24,
+              marginTop: 12,
+              alignItems: "center",
+              paddingVertical: 8,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Poppins_600SemiBold",
+                fontSize: 13,
+                color: colors.inkMuted,
+                textDecorationLine: "underline",
+              }}
+            >
+              Signaler un problème
+            </Text>
+          </Pressable>
+        ) : null}
 
         {/* Editorial tombstone */}
         <View
@@ -331,6 +377,12 @@ export default function OrderDetailScreen(): React.ReactElement {
         message={toastMessage}
         onHide={() => setToastVisible(false)}
         duration={2000}
+      />
+
+      <ReportProblemSheet
+        visible={reportOpen}
+        orderId={order.id}
+        onClose={() => setReportOpen(false)}
       />
 
       <SuccessOverlay

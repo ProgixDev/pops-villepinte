@@ -15,7 +15,6 @@ import {
   formatTimeFR,
 } from "@/lib/format";
 import { useDeliveriesStore } from "@/store/driver/deliveries.store";
-import { useEarningsStore } from "@/store/driver/earnings.store";
 import { useMenuStore } from "@/store/menu.store";
 import { useDriverLocationBroadcast } from "@/lib/driver/useDriverLocationBroadcast";
 import type { DeliveryStatus } from "@/types/driver";
@@ -30,9 +29,7 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
   const router = useRouter();
   const delivery = useDeliveriesStore((s) => (id ? s.byId[id] : undefined));
   const respond = useDeliveriesStore((s) => s.respond);
-  const markDelivered = useDeliveriesStore((s) => s.markDelivered);
   const fetchDeliveries = useDeliveriesStore((s) => s.fetch);
-  const refreshEarnings = useEarningsStore((s) => s.fetchAll);
   // Superadmin support line (configured in the admin dashboard). The call tile
   // only renders when one is set.
   const supportPhone = useMenuStore((s) => s.shopSettings?.support_phone);
@@ -111,21 +108,9 @@ export default function DriverDeliveryDetailScreen(): React.ReactElement {
     }
   };
 
-  const onDelivered = async (): Promise<void> => {
-    if (busy) return;
-    try {
-      setBusy(true);
-      await markDelivered(delivery.id);
-      void refreshEarnings();
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success,
-      ).catch(() => {});
-      router.back();
-    } catch (e) {
-      Alert.alert("Erreur", e instanceof Error ? e.message : "Erreur réseau");
-    } finally {
-      setBusy(false);
-    }
+  const onDelivered = (): void => {
+    // Hand off to the QR scan screen, which confirms + completes the delivery.
+    router.push(`/driver/scan/${delivery.id}` as never);
   };
 
   const primaryLabel = NEXT_LABEL[delivery.status];

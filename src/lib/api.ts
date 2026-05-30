@@ -209,6 +209,12 @@ export const ordersApi = {
     api<OrderData>(`/orders/${id}/cancel`, { method: "PATCH" }),
   confirmPickedUp: (id: string) =>
     api<OrderData>(`/orders/${id}/picked-up`, { method: "PATCH" }),
+  // Customer rates the driver after delivery (1..5 stars + optional feedback).
+  rate: (id: string, body: { stars: number; feedback?: string }) =>
+    api<{ id: string }>(`/orders/${id}/rating`, { method: "POST", body }),
+  // Customer files a problem ticket about their order/delivery.
+  report: (id: string, body: { category: string; description?: string }) =>
+    api<{ id: string }>(`/orders/${id}/report`, { method: "POST", body }),
 };
 
 // ─── Driver API ──────────────────────────────────────────────────────
@@ -304,9 +310,21 @@ export const driverApi = {
     api<DriverAssignment>(`/driver/assignments/${id}/picked-up`, {
       method: "PATCH",
     }),
-  delivered: (id: string) =>
+  delivered: (
+    id: string,
+    body: { method: "qr" | "manual"; code?: string },
+  ) =>
     api<DriverAssignment>(`/driver/assignments/${id}/delivered`, {
       method: "PATCH",
+      body,
+    }),
+  reportProblem: (
+    id: string,
+    body: { category: string; description?: string },
+  ) =>
+    api<{ id: string }>(`/driver/assignments/${id}/report`, {
+      method: "POST",
+      body,
     }),
   earnings: (period?: "today" | "week" | "month") =>
     api<DriverEarnings>("/driver/earnings", {
@@ -432,4 +450,8 @@ export type OrderData = {
   delivery_fee_eur?: number;
   /** Only populated on /orders/:id (not the list); null when not assigned. */
   active_driver_id?: string | null;
+  /** Per-order QR secret the customer shows the driver. Delivery orders only. */
+  delivery_code?: string | null;
+  /** The customer's rating of the driver, once left (single-order endpoint). */
+  driver_rating?: { stars: number; feedback: string | null } | null;
 };

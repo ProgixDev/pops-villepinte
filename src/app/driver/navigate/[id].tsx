@@ -18,7 +18,6 @@ import { colors, shadow } from "@/constants/theme";
 import { STORE_LAT, STORE_LNG } from "@/lib/delivery";
 import { formatDistanceMeters, formatDurationMinutes } from "@/lib/format";
 import { useDeliveriesStore } from "@/store/driver/deliveries.store";
-import { useEarningsStore } from "@/store/driver/earnings.store";
 import { useMenuStore } from "@/store/menu.store";
 import type { LngLat } from "@/types/driver";
 
@@ -71,8 +70,6 @@ export default function DriverNavigateScreen(): React.ReactElement {
 
   const delivery = useDeliveriesStore((s) => (id ? s.byId[id] : undefined));
   const fetchDeliveries = useDeliveriesStore((s) => s.fetch);
-  const markDelivered = useDeliveriesStore((s) => s.markDelivered);
-  const refreshEarnings = useEarningsStore((s) => s.fetchAll);
   const supportPhone = useMenuStore((s) => s.shopSettings?.support_phone);
 
   // Real GPS origin for the route start. Falls back to the storefront if the
@@ -81,7 +78,6 @@ export default function DriverNavigateScreen(): React.ReactElement {
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [arrived, setArrived] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [busy, setBusy] = useState(false);
 
   // Pull this assignment into the store if we arrived here directly (e.g.
   // accept → navigate straight from the push/assignment sheet, which doesn't
@@ -147,22 +143,12 @@ export default function DriverNavigateScreen(): React.ReactElement {
     Linking.openURL(`tel:${supportPhone.replace(/\s+/g, "")}`).catch(() => {});
   }, [supportPhone]);
 
-  const onDelivered = useCallback(async () => {
-    if (!delivery || busy) return;
-    try {
-      setBusy(true);
-      await markDelivered(delivery.id);
-      void refreshEarnings();
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success,
-      ).catch(() => {});
-      router.back();
-    } catch (e) {
-      Alert.alert("Erreur", e instanceof Error ? e.message : "Erreur réseau");
-    } finally {
-      setBusy(false);
-    }
-  }, [delivery, busy, markDelivered, refreshEarnings, router]);
+  const onDelivered = useCallback(() => {
+    if (!delivery) return;
+    // Hand off to the QR scan screen, which verifies the customer's code and
+    // completes the delivery (or offers the manual / report fallbacks).
+    router.push(`/driver/scan/${delivery.id}` as never);
+  }, [delivery, router]);
 
   // ── Guards ──
   if (MAPBOX_PUBLIC_TOKEN === "") {
@@ -386,7 +372,6 @@ export default function DriverNavigateScreen(): React.ReactElement {
               accessibilityRole="button"
               accessibilityLabel="Marquer comme livrée"
               onPress={onDelivered}
-              disabled={busy}
               style={({ pressed }) => ({
                 flex: 1,
                 flexDirection: "row",
@@ -396,27 +381,21 @@ export default function DriverNavigateScreen(): React.ReactElement {
                 height: 52,
                 borderRadius: 14,
                 backgroundColor: colors.success,
-                opacity: pressed || busy ? 0.85 : 1,
+                opacity: pressed ? 0.85 : 1,
               })}
             >
-              {busy ? (
-                <ActivityIndicator color={colors.surface} />
-              ) : (
-                <>
-                  <Check size={18} color={colors.surface} strokeWidth={2.5} />
-                  <Text
-                    style={{
-                      fontFamily: "Poppins_700Bold",
-                      fontSize: 13,
-                      letterSpacing: 1,
-                      color: colors.surface,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Livrée
-                  </Text>
-                </>
-              )}
+              <Check size={18} color={colors.surface} strokeWidth={2.5} />
+              <Text
+                style={{
+                  fontFamily: "Poppins_700Bold",
+                  fontSize: 13,
+                  letterSpacing: 1,
+                  color: colors.surface,
+                  textTransform: "uppercase",
+                }}
+              >
+                Livrée
+              </Text>
             </Pressable>
           </View>
         </View>

@@ -55,6 +55,12 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "POP'S utilise la caméra pour scanner le QR de livraison du client."
+        }
+      ],
+      [
         "@rnmapbox/maps",
         {
           "RNMapboxMapsVersion": "11.20.1"

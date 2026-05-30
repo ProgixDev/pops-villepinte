@@ -7,6 +7,8 @@ import {
   PublicLoyaltyController,
 } from './admin-customers.controller';
 import { AdminCustomersService } from './admin-customers.service';
+import { AdminSupportController } from './admin-support.controller';
+import { AdminSupportService } from './admin-support.service';
 
 @Module({
   controllers: [
@@ -14,8 +16,9 @@ import { AdminCustomersService } from './admin-customers.service';
     AdminCustomersController,
     AdminLoyaltyController,
     PublicLoyaltyController,
+    AdminSupportController,
   ],
-  providers: [AdminCatalogueService, AdminCustomersService],
+  providers: [AdminCatalogueService, AdminCustomersService, AdminSupportService],
   exports: [AdminCustomersService],
 })
 export class AdminModule {}

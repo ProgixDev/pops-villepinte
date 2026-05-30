@@ -193,7 +193,11 @@ export class DriversMeService {
     return data;
   }
 
-  async markDelivered(driverId: string, assignmentId: string) {
+  async markDelivered(
+    driverId: string,
+    assignmentId: string,
+    opts: { method: 'qr' | 'manual'; code?: string },
+  ) {
     const current = await this.getMyAssignment(driverId, assignmentId);
     if (current.status !== 'accepted') {
       throw new BadRequestException(
@@ -205,6 +209,23 @@ export class DriversMeService {
     }
     if (!current.order_id) {
       throw new BadRequestException('Commande liée introuvable.');
+    }
+
+    // QR handoff: verify the scanned code against the order's secret. The
+    // driver app never receives delivery_code (it's not in ASSIGNMENT_SELECT),
+    // so a valid code proves the driver scanned the customer's screen. The
+    // 'manual' method is the logged "confirmer sans QR" fallback.
+    if (opts.method === 'qr') {
+      const { data: ord } = await this.supabase
+        .from('orders')
+        .select('delivery_code')
+        .eq('id', current.order_id)
+        .maybeSingle();
+      const expected = (ord?.delivery_code ?? '').toUpperCase();
+      const provided = (opts.code ?? '').trim().toUpperCase();
+      if (!expected || provided !== expected) {
+        throw new BadRequestException('QR invalide — commande non livrée.');
+      }
     }
 
     // Walk the order to the terminal 'picked_up' state. It's normally already
@@ -226,9 +247,36 @@ export class DriversMeService {
 
     const { data, error } = await this.supabase
       .from('order_assignments')
-      .update({ delivered_at: new Date().toISOString() })
+      .update({
+        delivered_at: new Date().toISOString(),
+        delivered_method: opts.method,
+      })
       .eq('id', assignmentId)
       .select(ASSIGNMENT_SELECT)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  /** Driver files a delivery problem ticket. Does NOT mark the course delivered. */
+  async reportProblem(
+    driverId: string,
+    assignmentId: string,
+    category: string,
+    description?: string,
+  ) {
+    const current = await this.getMyAssignment(driverId, assignmentId);
+    const { data, error } = await this.supabase
+      .from('delivery_tickets')
+      .insert({
+        order_id: current.order_id,
+        assignment_id: assignmentId,
+        reporter_id: driverId,
+        reporter_role: 'driver',
+        category,
+        description: description?.trim() || null,
+      })
+      .select()
       .single();
     if (error) throw error;
     return data;

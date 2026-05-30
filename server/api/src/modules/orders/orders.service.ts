@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import {
   BadRequestException,
   ForbiddenException,
@@ -335,6 +336,12 @@ export class OrdersService {
         delivery_lat: deliveryLat,
         delivery_lng: deliveryLng,
         delivery_fee_eur: deliveryFee,
+        // Per-order secret the customer shows as a QR; the driver scans it to
+        // confirm handoff. Only generated for delivery orders.
+        delivery_code:
+          pickupMode === 'delivery'
+            ? randomBytes(8).toString('hex').toUpperCase().slice(0, 10)
+            : null,
       })
       .select()
       .single();
@@ -423,10 +430,100 @@ export class OrdersService {
       .is('delivered_at', null)
       .maybeSingle();
 
+    // Surface any rating the customer already left so the app shows the recap
+    // instead of re-prompting. Only relevant once the delivery is complete.
+    let driverRating: { stars: number; feedback: string | null } | null = null;
+    if (data.status === 'picked_up' && data.pickup_mode === 'delivery') {
+      const { data: r } = await this.supabase
+        .from('driver_ratings')
+        .select('stars, feedback')
+        .eq('order_id', orderId)
+        .maybeSingle();
+      driverRating = r ?? null;
+    }
+
     return {
       ...data,
       active_driver_id: assignment?.driver_id ?? null,
+      driver_rating: driverRating,
     };
+  }
+
+  /** Customer files a delivery problem ticket (visible to the superadmin). */
+  async reportCustomerProblem(
+    userId: string,
+    orderId: string,
+    category: string,
+    description?: string,
+  ) {
+    // Ownership check (throws 404 if the order isn't the caller's).
+    await this.getCustomerOrderById(userId, orderId);
+    const { data: assignment } = await this.supabase
+      .from('order_assignments')
+      .select('id')
+      .eq('order_id', orderId)
+      .order('assigned_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const { data, error } = await this.supabase
+      .from('delivery_tickets')
+      .insert({
+        order_id: orderId,
+        assignment_id: assignment?.id ?? null,
+        reporter_id: userId,
+        reporter_role: 'customer',
+        category,
+        description: description?.trim() || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  /** Customer rates the driver after a completed delivery (1 per assignment). */
+  async rateDriver(
+    userId: string,
+    orderId: string,
+    stars: number,
+    feedback?: string,
+  ) {
+    const order = await this.getCustomerOrderById(userId, orderId);
+    if (order.status !== 'picked_up') {
+      throw new BadRequestException(
+        'Tu pourras noter une fois la commande livrée.',
+      );
+    }
+    const { data: assignment } = await this.supabase
+      .from('order_assignments')
+      .select('id, driver_id')
+      .eq('order_id', orderId)
+      .not('delivered_at', 'is', null)
+      .order('delivered_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!assignment?.driver_id) {
+      throw new BadRequestException(
+        'Aucun livreur à noter pour cette commande.',
+      );
+    }
+    const { data, error } = await this.supabase
+      .from('driver_ratings')
+      .upsert(
+        {
+          assignment_id: assignment.id,
+          order_id: orderId,
+          driver_id: assignment.driver_id,
+          customer_id: userId,
+          stars,
+          feedback: feedback?.trim() || null,
+        },
+        { onConflict: 'assignment_id' },
+      )
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   }
 
   async cancelCustomerOrder(userId: string, orderId: string) {

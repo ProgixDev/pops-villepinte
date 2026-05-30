@@ -39,6 +39,8 @@ function toOrder(data: OrderData): Order {
     deliveryLng: data.delivery_lng ?? undefined,
     deliveryFeeEUR: data.delivery_fee_eur,
     activeDriverId: data.active_driver_id ?? null,
+    deliveryCode: data.delivery_code ?? null,
+    driverRating: data.driver_rating ?? null,
   };
 }
 

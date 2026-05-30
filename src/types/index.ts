@@ -72,6 +72,10 @@ export type Order = {
    * Drives the customer-side live tracking map.
    */
   activeDriverId?: string | null;
+  /** QR secret to show the driver for handoff (delivery orders, single-order endpoint). */
+  deliveryCode?: string | null;
+  /** The rating the customer already left for this delivery, if any. */
+  driverRating?: { stars: number; feedback: string | null } | null;
 };
 
 export type Profile = {

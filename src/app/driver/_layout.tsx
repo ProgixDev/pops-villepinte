@@ -58,6 +58,8 @@ export default function DriverLayout(): React.ReactNode {
       <Stack.Screen name="assignment/[id]" options={{ presentation: "modal" }} />
       <Stack.Screen name="delivery/[id]" />
       <Stack.Screen name="navigate/[id]" />
+      <Stack.Screen name="scan/[id]" options={{ presentation: "modal" }} />
+      <Stack.Screen name="report/[id]" options={{ presentation: "modal" }} />
     </Stack>
   );
 }
