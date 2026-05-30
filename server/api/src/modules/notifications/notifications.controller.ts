@@ -92,12 +92,13 @@ export class AdminNotificationsController {
     if (dto.userIds && dto.userIds.length > 0) {
       return { kind: 'user', userIds: dto.userIds };
     }
+    if (dto.audience === 'drivers') return { kind: 'drivers' };
     if (dto.audience === 'all') return { kind: 'all' };
     if (dto.tiers && dto.tiers.length > 0) {
       return { kind: 'tier', tiers: dto.tiers };
     }
     throw new BadRequestException(
-      'Choisis une audience : tiers, userIds, ou "all".',
+      'Choisis une audience : tiers, livreurs, userIds, ou "all".',
     );
   }
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "746364603407",
+    "project_id": "pops-4e44a",
+    "storage_bucket": "pops-4e44a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:746364603407:android:ed91b6e096ea8627ea677a",
+        "android_client_info": {
+          "package_name": "com.progix.popsvillepinte"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUHFHc_dBphcUtWuWUR-ZM92ZYX9GZuaQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

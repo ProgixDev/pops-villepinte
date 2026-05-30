@@ -255,10 +255,18 @@ export default function DeliveryPickerScreen(): React.ReactElement {
       void Haptics.selectionAsync();
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      flyTo(pos.coords.latitude, pos.coords.longitude, 16);
+      // First fix right after the grant can throw on a cold GPS provider —
+      // fall back to the last-known fix so the user doesn't need to restart.
+      let pos: Location.LocationObject | null = null;
+      try {
+        pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+      } catch {
+        pos = await Location.getLastKnownPositionAsync();
+      }
+      if (!pos) pos = await Location.getLastKnownPositionAsync();
+      if (pos) flyTo(pos.coords.latitude, pos.coords.longitude, 16);
     } catch {
       // ignore — user can still pan manually
     }

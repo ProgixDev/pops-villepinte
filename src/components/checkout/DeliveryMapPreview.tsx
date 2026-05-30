@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import Mapbox, {
+import {
   Camera,
   LocationPuck,
   MapView,

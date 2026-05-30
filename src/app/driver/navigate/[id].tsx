@@ -99,11 +99,22 @@ export default function DriverNavigateScreen(): React.ReactElement {
           if (!cancelled) setOrigin(STORE_ORIGIN);
           return;
         }
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        // The first getCurrentPositionAsync right after a grant can throw on a
+        // cold GPS provider — fall back to the last-known fix (then the store)
+        // so the route starts without needing an app restart.
+        let pos: Location.LocationObject | null = null;
+        try {
+          pos = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+        } catch {
+          pos = await Location.getLastKnownPositionAsync();
+        }
+        if (!pos) pos = await Location.getLastKnownPositionAsync();
         if (!cancelled) {
-          setOrigin([pos.coords.longitude, pos.coords.latitude]);
+          setOrigin(
+            pos ? [pos.coords.longitude, pos.coords.latitude] : STORE_ORIGIN,
+          );
         }
       } catch {
         if (!cancelled) setOrigin(STORE_ORIGIN);

@@ -17,6 +17,9 @@ export type ExpoPushMessage = {
   channelId?: string;
   priority?: 'default' | 'normal' | 'high';
   badge?: number;
+  // Maps to a notification category registered on the device (see lib/push.ts).
+  // Drives the Accepter/Refuser action buttons on the driver-assignment push.
+  categoryId?: string;
 };
 
 type ExpoTicket = {

@@ -35,10 +35,12 @@ export class BroadcastDto {
   @IsString({ each: true })
   userIds?: string[];
 
+  // 'all'      → every customer
+  // 'drivers'  → every non-blocked driver
   @IsOptional()
   @IsString()
-  @IsIn(['all'])
-  audience?: 'all';
+  @IsIn(['all', 'drivers'])
+  audience?: 'all' | 'drivers';
 }
 
 export class RegisterTokenDto {

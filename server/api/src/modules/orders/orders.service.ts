@@ -31,6 +31,20 @@ import { CustomerOrdersQueryDto, AdminOrdersQueryDto } from './dto/orders-query.
 import { OrdersGateway } from './orders.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 
+// Order items joined with the real names/prices of whatever they reference —
+// a food product (+ optional variant) OR an accompagnement (drink/side). The
+// admin dashboard renders from these embedded rows instead of a static seed,
+// so item labels and prices are always correct (incl. Coca-Cola drinks).
+const ADMIN_ORDER_SELECT = `
+  *,
+  order_items (
+    *,
+    products:products!order_items_product_id_fkey ( id, name, price_eur ),
+    product_variants:product_variants!order_items_variant_id_fkey ( id, label, price_eur ),
+    accompagnements:accompagnements!order_items_accompagnement_id_fkey ( id, name, price_eur )
+  )
+`;
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -321,12 +335,22 @@ export class OrdersService {
       Date.now() + (maxPrepTime + DEFAULT_PREP_BUFFER_MINUTES) * 60 * 1000,
     ).toISOString();
 
+    // Capture the customer's phone from their profile so the superadmin (and
+    // the driver) can contact them. Stored on the order as a snapshot rather
+    // than joined later, so it survives even if the profile changes.
+    const { data: profile } = await this.supabase
+      .from('profiles')
+      .select('phone')
+      .eq('id', userId)
+      .maybeSingle();
+
     // 5. Insert order
     const { data: order, error: orderError } = await this.supabase
       .from('orders')
       .insert({
         user_id: userId,
         customer_name: dto.customerName,
+        customer_phone: profile?.phone ?? null,
         total_eur: totalEur,
         status: 'received' as OrderStatus,
         estimated_ready_at: estimatedReadyAt,
@@ -542,7 +566,7 @@ export class OrdersService {
   async getAdminOrders(query: AdminOrdersQueryDto) {
     let qb = this.supabase
       .from('orders')
-      .select('*, order_items(*)');
+      .select(ADMIN_ORDER_SELECT);
 
     if (query.status) {
       qb = qb.eq('status', query.status);
@@ -623,7 +647,7 @@ export class OrdersService {
       .from('orders')
       .update(updateData)
       .eq('id', orderId)
-      .select('*, order_items(*)')
+      .select(ADMIN_ORDER_SELECT)
       .single();
 
     if (error) throw error;

@@ -70,6 +70,10 @@ export default function DriverHomeScreen(): React.ReactElement {
   // Mounting it before permission resolves makes rnmapbox spin up the native
   // location provider without authorization, which can crash on iOS.
   const [locationGranted, setLocationGranted] = useState(false);
+  // Gate the whole map mount on the permission prompt being answered. rnmapbox
+  // starts its location engine at map load, so the puck must be present in the
+  // map's FIRST render — otherwise it won't track until the app is restarted.
+  const [permResolved, setPermResolved] = useState(false);
 
   // Defer mounting the native <MapView> until the screen-entry transition has
   // settled. Mounting a heavy Fabric native view (the map) on the JS thread
@@ -96,9 +100,16 @@ export default function DriverHomeScreen(): React.ReactElement {
     // deterministic prompt and lets us hold off mounting the native location
     // provider until we're authorized. If the user denies, the map still
     // works — they just won't see the puck.
-    void Location.requestForegroundPermissionsAsync()
-      .then(({ status }) => setLocationGranted(status === "granted"))
-      .catch(() => {});
+    void (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        setLocationGranted(status === "granted");
+      } catch {
+        /* denied / unavailable — the map still renders, just without the puck */
+      } finally {
+        setPermResolved(true);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -177,7 +188,7 @@ export default function DriverHomeScreen(): React.ReactElement {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {mapReady ? (
+      {mapReady && permResolved ? (
         <MapView
           style={{ flex: 1 }}
           styleURL={DRIVER_MAP_STYLE}

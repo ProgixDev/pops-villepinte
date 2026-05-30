@@ -17,9 +17,15 @@ import AnimatedSplash from "@/components/splash/AnimatedSplash";
 import { useAppFonts } from "@/constants/fonts";
 import { ROUTES } from "@/constants/routes";
 import { preloadFlowImages } from "@/lib/preloadImages";
-import { registerDriverPushAsync, registerForPushAsync } from "@/lib/push";
+import {
+  ACTION_ACCEPT,
+  ACTION_REFUSE,
+  registerDriverPushAsync,
+  registerForPushAsync,
+} from "@/lib/push";
 import { supabase } from "@/lib/supabase";
-import type { NotificationData } from "@/lib/api";
+import { driverApi, type NotificationData } from "@/lib/api";
+import { useDeliveriesStore } from "@/store/driver/deliveries.store";
 import { useAuthStore } from "@/store/auth.store";
 import { useFavoritesStore } from "@/store/favorites.store";
 import { useMenuStore } from "@/store/menu.store";
@@ -187,8 +193,30 @@ export default function RootLayout(): React.ReactNode {
           | { orderId?: string; kind?: string; assignmentId?: string }
           | undefined;
         if (data?.kind === "driver-assignment" && data.assignmentId) {
-          // New course for a driver → open the accept/refuse sheet directly.
-          router.push(`/driver/assignment/${data.assignmentId}` as never);
+          const assignmentId = data.assignmentId;
+          // Call-style action buttons on the assignment push. Accepter →
+          // accept server-side and jump into navigation; Refuser → refuse and
+          // stay put. A plain tap (no action) opens the accept/refuse sheet.
+          if (res.actionIdentifier === ACTION_ACCEPT) {
+            void driverApi
+              .respond(assignmentId, "accepted")
+              .then(() => {
+                void useDeliveriesStore.getState().fetch();
+                router.push(`/driver/navigate/${assignmentId}` as never);
+              })
+              .catch(() => {
+                // Fall back to the sheet if the quick-accept failed.
+                router.push(`/driver/assignment/${assignmentId}` as never);
+              });
+          } else if (res.actionIdentifier === ACTION_REFUSE) {
+            void driverApi
+              .respond(assignmentId, "refused")
+              .then(() => void useDeliveriesStore.getState().fetch())
+              .catch(() => {});
+          } else {
+            // New course for a driver → open the accept/refuse sheet directly.
+            router.push(`/driver/assignment/${assignmentId}` as never);
+          }
         } else if (data?.kind === "order" && data.orderId) {
           router.push({
             pathname: "/order/[id]",

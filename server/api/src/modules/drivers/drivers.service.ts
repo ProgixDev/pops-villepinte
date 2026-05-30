@@ -300,6 +300,9 @@ export class DriversService {
             notificationKind: 'order',
             orderId: order.id,
             data: { assignmentId: created.id, kind: 'driver-assignment' },
+            // Shows the Accepter / Refuser buttons directly on the lock-screen
+            // notification (category registered in the app's lib/push.ts).
+            categoryId: 'driver-assignment',
           },
         )
         .catch(() => {});

@@ -10,7 +10,8 @@ import { isExpoPushToken, sendExpoPush } from './expo-push';
 export type NotifyAudience =
   | { kind: 'user'; userIds: string[] }
   | { kind: 'tier'; tiers: ('BIENVENUE' | 'HABITUE' | 'VIP' | 'LEGENDE')[] }
-  | { kind: 'all' };
+  | { kind: 'all' }
+  | { kind: 'drivers' };
 
 export type NotifyPayload = {
   title: string;
@@ -18,6 +19,10 @@ export type NotifyPayload = {
   notificationKind: 'order' | 'broadcast';
   orderId?: string;
   data?: Record<string, unknown>;
+  // Device notification category → enables action buttons (e.g. the driver
+  // assignment Accepter/Refuser buttons). Only affects the OS push, not the
+  // in-app row.
+  categoryId?: string;
 };
 
 @Injectable()
@@ -29,6 +34,17 @@ export class NotificationsService {
   /** Resolve user ids for a given audience. */
   private async resolveUserIds(audience: NotifyAudience): Promise<string[]> {
     if (audience.kind === 'user') return audience.userIds;
+
+    // Drivers are a distinct role — notify every non-blocked driver.
+    if (audience.kind === 'drivers') {
+      const { data: drivers, error: dErr } = await this.supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'driver')
+        .eq('is_blocked', false);
+      if (dErr) throw dErr;
+      return (drivers ?? []).map((d) => d.id);
+    }
 
     const { data: profiles, error } = await this.supabase
       .from('profiles')
@@ -106,6 +122,8 @@ export class NotificationsService {
       title: payload.title,
       body: payload.body,
       sound: 'default' as const,
+      // Carries the Accepter/Refuser action buttons when set (driver assignment).
+      ...(payload.categoryId ? { categoryId: payload.categoryId } : {}),
       // payload.data spread LAST so an explicit data.kind (e.g.
       // 'driver-assignment') and assignmentId survive — the tap handler in the
       // app routes on data.kind, and notificationKind would otherwise clobber it.
