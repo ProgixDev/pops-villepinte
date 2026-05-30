@@ -26,6 +26,13 @@ export class OrdersController {
     return this.ordersService.getCustomerOrders(user.id, query);
   }
 
+  // Customer lists their own problem tickets so they can track resolution.
+  // MUST be declared before `:id` — otherwise "reports" matches the :id param.
+  @Get('reports')
+  listReports(@CurrentUser() user: { id: string }) {
+    return this.ordersService.listCustomerTickets(user.id);
+  }
+
   @Get(':id')
   getOrder(
     @CurrentUser() user: { id: string },

@@ -226,6 +226,20 @@ export const ordersApi = {
     id: string,
     body: { category: string; description?: string; imageUrls?: string[] },
   ) => api<{ id: string }>(`/orders/${id}/report`, { method: "POST", body }),
+  // Customer's own problem tickets, newest first, so they can track resolution.
+  myReports: () => api<CustomerTicket[]>("/orders/reports"),
+};
+
+export type CustomerTicket = {
+  id: string;
+  order_id: string;
+  category: string;
+  description: string | null;
+  status: "open" | "resolved";
+  admin_notes: string | null;
+  image_urls: string[] | null;
+  created_at: string;
+  resolved_at: string | null;
 };
 
 // ─── Driver API ──────────────────────────────────────────────────────

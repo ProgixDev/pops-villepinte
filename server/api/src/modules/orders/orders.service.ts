@@ -473,6 +473,19 @@ export class OrdersService {
     };
   }
 
+  /** Customer's own problem tickets, newest first, so they can track status. */
+  async listCustomerTickets(userId: string) {
+    const { data, error } = await this.supabase
+      .from('delivery_tickets')
+      .select(
+        'id, order_id, category, description, status, admin_notes, image_urls, created_at, resolved_at',
+      )
+      .eq('reporter_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  }
+
   /** Customer files a delivery problem ticket (visible to the superadmin). */
   async reportCustomerProblem(
     userId: string,

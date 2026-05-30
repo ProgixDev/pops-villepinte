@@ -1,11 +1,14 @@
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  AlertTriangle,
   ArrowLeft,
   Award,
   Bell,
+  CheckCircle2,
   Clock,
   FileText,
   Heart,
@@ -14,6 +17,7 @@ import {
 } from "lucide-react-native";
 
 import ProductRow from "@/components/menu/ProductRow";
+import { ordersApi, type CustomerTicket } from "@/lib/api";
 import { useFavoritesStore } from "@/store/favorites.store";
 import { useMenuStore } from "@/store/menu.store";
 import type { Product } from "@/types";
@@ -28,12 +32,19 @@ const BODY = "Poppins_400Regular";
 const BODY_MEDIUM = "Poppins_500Medium";
 const BODY_SEMI = "Poppins_600SemiBold";
 
-type SlugKey = "favoris" | "fidelite" | "notifications" | "conditions" | "contact";
+type SlugKey =
+  | "favoris"
+  | "fidelite"
+  | "notifications"
+  | "signalements"
+  | "conditions"
+  | "contact";
 
 const TITLES: Record<SlugKey, string> = {
   favoris: "Favoris",
   fidelite: "Programme fidélité",
   notifications: "Notifications",
+  signalements: "Mes signalements",
   conditions: "Conditions générales",
   contact: "Nous contacter",
 };
@@ -356,6 +367,230 @@ function ContactContent(): React.ReactElement {
   );
 }
 
+/* ─────────────── SIGNALEMENTS ─────────────── */
+function formatTicketDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function TicketCard({ ticket }: { ticket: CustomerTicket }): React.ReactElement {
+  const resolved = ticket.status === "resolved";
+  return (
+    <View
+      style={{
+        backgroundColor: WHITE,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: "#EEEEEE",
+        padding: 16,
+        marginBottom: 12,
+      }}
+    >
+      {/* Status + date */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            backgroundColor: resolved ? "#E8F8EE" : "#FDECEA",
+            borderRadius: 999,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+          }}
+        >
+          {resolved ? (
+            <CheckCircle2 size={13} color="#0E7C3A" strokeWidth={2.5} />
+          ) : (
+            <Clock size={13} color="#8B1A11" strokeWidth={2.5} />
+          )}
+          <Text
+            style={{
+              fontFamily: BODY_SEMI,
+              fontSize: 10,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              color: resolved ? "#0E7C3A" : "#8B1A11",
+            }}
+          >
+            {resolved ? "Résolu" : "En cours"}
+          </Text>
+        </View>
+        <Text style={{ fontFamily: BODY, fontSize: 11, color: MUTED }}>
+          {formatTicketDate(ticket.created_at)}
+        </Text>
+      </View>
+
+      {/* Category + order */}
+      <Text style={{ fontFamily: BODY_SEMI, fontSize: 15, color: INK, marginTop: 12 }}>
+        {ticket.category}
+      </Text>
+      <Text style={{ fontFamily: BODY, fontSize: 12, color: MUTED, marginTop: 2 }}>
+        Commande {ticket.order_id}
+      </Text>
+
+      {/* Description */}
+      {ticket.description ? (
+        <Text
+          style={{
+            fontFamily: BODY,
+            fontSize: 13,
+            color: INK,
+            lineHeight: 19,
+            marginTop: 10,
+          }}
+        >
+          « {ticket.description} »
+        </Text>
+      ) : null}
+
+      {/* Attached photos */}
+      {ticket.image_urls && ticket.image_urls.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginTop: 12 }}
+          contentContainerStyle={{ gap: 8 }}
+        >
+          {ticket.image_urls.map((url) => (
+            <Image
+              key={url}
+              source={url}
+              contentFit="cover"
+              style={{ width: 72, height: 72, borderRadius: 12, backgroundColor: "#F0F0F0" }}
+              accessibilityIgnoresInvertColors
+            />
+          ))}
+        </ScrollView>
+      ) : null}
+
+      {/* Admin reply */}
+      {ticket.admin_notes ? (
+        <View
+          style={{
+            marginTop: 12,
+            backgroundColor: "#FFFBEB",
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: "#F5E7A4",
+            padding: 12,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: BODY_SEMI,
+              fontSize: 10,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              color: MUTED,
+            }}
+          >
+            {"Réponse de l'équipe POP'S"}
+          </Text>
+          <Text
+            style={{
+              fontFamily: BODY,
+              fontSize: 13,
+              color: INK,
+              lineHeight: 19,
+              marginTop: 4,
+            }}
+          >
+            {ticket.admin_notes}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function SignalementsContent(): React.ReactElement {
+  const [tickets, setTickets] = useState<CustomerTicket[] | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(false);
+    void ordersApi
+      .myReports()
+      .then((data) => {
+        if (!cancelled) setTickets(data);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(true);
+          setTickets([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (tickets === null) {
+    return (
+      <View style={{ alignItems: "center", paddingTop: 64 }}>
+        <ActivityIndicator color={PRIMARY} />
+      </View>
+    );
+  }
+
+  if (tickets.length === 0) {
+    return (
+      <View style={{ alignItems: "center", paddingTop: 48, paddingHorizontal: 20 }}>
+        <AlertTriangle size={64} color={PRIMARY} strokeWidth={1.5} />
+        <Text
+          style={{
+            fontFamily: DISPLAY,
+            fontSize: 28,
+            color: INK,
+            marginTop: 24,
+            textAlign: "center",
+          }}
+        >
+          {error ? "Chargement impossible" : "Aucun signalement"}
+        </Text>
+        <Text
+          style={{
+            fontFamily: BODY,
+            fontSize: 15,
+            color: MUTED,
+            marginTop: 12,
+            textAlign: "center",
+            lineHeight: 22,
+          }}
+        >
+          {error
+            ? "Vérifie ta connexion et réessaie."
+            : "Tes problèmes signalés depuis une commande apparaîtront ici, avec leur suivi."}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ paddingTop: 16, paddingHorizontal: 20 }}>
+      {tickets.map((t) => (
+        <TicketCard key={t.id} ticket={t} />
+      ))}
+    </View>
+  );
+}
+
 /* ─────────────── MAIN SCREEN ─────────────── */
 export default function SettingsScreen(): React.ReactElement {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -373,6 +608,8 @@ export default function SettingsScreen(): React.ReactElement {
         return <FideliteContent />;
       case "notifications":
         return <NotificationsContent />;
+      case "signalements":
+        return <SignalementsContent />;
       case "conditions":
         return <ConditionsContent />;
       case "contact":

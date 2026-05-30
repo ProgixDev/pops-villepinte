@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import {
+  AlertTriangle,
   Award,
   Bell,
   CheckCircle,
@@ -498,6 +499,14 @@ export default function ProfileScreen(): React.ReactElement {
             }}
           />
           <SettingsRow icon={Bell} label="Notifications" onPress={() => router.push(ROUTES.settings("notifications"))} />
+          <View
+            style={{
+              height: 1,
+              backgroundColor: colors.border,
+              marginLeft: 56,
+            }}
+          />
+          <SettingsRow icon={AlertTriangle} label="Mes signalements" onPress={() => router.push(ROUTES.settings("signalements"))} />
           <View
             style={{
               height: 1,
