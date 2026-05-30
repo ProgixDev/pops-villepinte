@@ -1,29 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  InteractionManager,
   Keyboard,
   Pressable,
   Text,
   TextInput,
   View,
 } from "react-native";
-import {
-  Camera,
-  LocationPuck,
-  MapView,
-  type MapState,
-} from "@rnmapbox/maps";
-
-type CameraHandle = {
-  setCamera: (
-    config: {
-      centerCoordinate: [number, number];
-      zoomLevel?: number;
-      animationDuration?: number;
-    },
-  ) => void;
-};
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -51,15 +34,11 @@ import {
 } from "@/lib/delivery";
 import { useMenuStore } from "@/store/menu.store";
 import { ensureLocationPermission } from "@/lib/location";
-import {
-  MAPBOX_STYLE_STREETS,
-  initMapbox,
-  mapboxReverseGeocode,
-  mapboxSearch,
-} from "@/lib/mapbox";
+import { mapboxReverseGeocode, mapboxSearch } from "@/lib/mapbox";
 import { useDeliveryDraftStore } from "@/store/deliveryDraft.store";
-
-initMapbox();
+import WebMapPicker, {
+  type WebMapHandle,
+} from "@/components/checkout/WebMapPicker";
 
 export default function DeliveryPickerScreen(): React.ReactElement {
   const router = useRouter();
@@ -67,7 +46,7 @@ export default function DeliveryPickerScreen(): React.ReactElement {
   const params = useLocalSearchParams<{ lat?: string; lng?: string }>();
   const setPicked = useDeliveryDraftStore((s) => s.setPicked);
 
-  const cameraRef = useRef<CameraHandle | null>(null);
+  const webMapRef = useRef<WebMapHandle | null>(null);
   const lastReverseSeq = useRef(0);
   const lastSearchSeq = useRef(0);
   // Mirror of the live map centre — updated synchronously from
@@ -109,51 +88,49 @@ export default function DeliveryPickerScreen(): React.ReactElement {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // Only mount the <LocationPuck> once foreground permission is actually
-  // granted — rendering it while the status is undetermined crashes the Mapbox
-  // SDK. Mirrors the driver home screen.
-  const [locationGranted, setLocationGranted] = useState(false);
-  // Gate the whole map mount on the permission prompt being answered. rnmapbox
-  // starts its location engine at map load, so the puck must be present in the
-  // map's FIRST render — otherwise it won't track until the screen is reopened.
-  const [permResolved, setPermResolved] = useState(false);
+  // The Mapbox GL map lives inside a WebView (no native rnmapbox view), so the
+  // Android Fabric mount crash is gone. Unlike the native map, dispatching a
+  // camera command before load is harmless here (injectJavaScript no-ops and
+  // `window.__fly` is null-guarded), so there's no mapLoaded gate to block the
+  // recenter button.
 
-  // Defer mounting the native <MapView> until the screen-entry transition has
-  // settled. Mounting a heavy Fabric native view (the map) on the JS thread
-  // *while* the navigation push transition is doing a synchronous main-thread
-  // view update deadlocks both threads on the Fabric ComponentDescriptorRegistry
-  // lock — a hard crash/freeze on Android (and iOS). This is the exact guard the
-  // driver home map uses; runAfterInteractions lets the transition release the
-  // UI thread before we commit the map.
-  const [mapReady, setMapReady] = useState(false);
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      setMapReady(true);
-    });
-    return () => task.cancel();
-  }, []);
-
-  // The <Camera> ref attaches on commit, but the native map view isn't
-  // registered until Mapbox finishes loading the style. Dispatching an
-  // imperative camera command before that sends a viewmanager command to a
-  // reactTag the native side doesn't know yet ("Unknown reactTag"). Gate
-  // imperative camera calls (flyTo / recenter) on this flag.
-  const [mapLoaded, setMapLoaded] = useState(false);
-
-  // Resolve foreground permission up-front, then flip permResolved so the map
-  // can mount with the puck correctly present from its first render.
+  // One-shot device fix, requested up-front, used to drop the "you are here"
+  // dot on the map (set once the GL map is ready / on recenter).
+  const userCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    void ensureLocationPermission()
-      .then((granted) => {
-        if (!cancelled) setLocationGranted(granted);
-      })
-      .finally(() => {
-        if (!cancelled) setPermResolved(true);
-      });
+    void (async () => {
+      try {
+        const granted = await ensureLocationPermission();
+        if (!granted || cancelled) return;
+        const pos =
+          (await Location.getLastKnownPositionAsync().catch(() => null)) ??
+          (await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          }).catch(() => null));
+        if (pos && !cancelled) {
+          userCoordsRef.current = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          };
+          // If the map already loaded before the fix arrived, place the dot now.
+          webMapRef.current?.setUserLocation(
+            pos.coords.latitude,
+            pos.coords.longitude,
+          );
+        }
+      } catch {
+        // no fix — the picker still works, just without the "you are here" dot
+      }
+    })();
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const handleMapReady = useCallback((): void => {
+    const u = userCoordsRef.current;
+    if (u) webMapRef.current?.setUserLocation(u.lat, u.lng);
   }, []);
 
   // Selection is "fresh" when the on-screen pin coincides with the locked
@@ -230,18 +207,9 @@ export default function DeliveryPickerScreen(): React.ReactElement {
     return () => clearTimeout(handle);
   }, [query]);
 
-  const flyTo = useCallback(
-    (lat: number, lng: number, zoom = 16) => {
-      // Don't dispatch a camera command before the native map is registered.
-      if (!mapLoaded) return;
-      cameraRef.current?.setCamera({
-        centerCoordinate: [lng, lat],
-        zoomLevel: zoom,
-        animationDuration: 400,
-      });
-    },
-    [mapLoaded],
-  );
+  const flyTo = useCallback((lat: number, lng: number, zoom = 16) => {
+    webMapRef.current?.flyTo(lat, lng, zoom);
+  }, []);
 
   const handleSelectSuggestion = (addr: DeliveryAddress) => {
     void Haptics.selectionAsync();
@@ -307,8 +275,11 @@ export default function DeliveryPickerScreen(): React.ReactElement {
   const handleRecenterOnMe = async () => {
     try {
       void Haptics.selectionAsync();
+      // Instant feedback: if we already have a fix, fly there immediately while
+      // we refresh it in the background.
+      const cached = userCoordsRef.current;
+      if (cached) flyTo(cached.lat, cached.lng, 16);
       const granted = await ensureLocationPermission();
-      setLocationGranted(granted);
       if (!granted) return;
       // First fix right after the grant can throw on a cold GPS provider —
       // fall back to the last-known fix so the user doesn't need to restart.
@@ -321,7 +292,17 @@ export default function DeliveryPickerScreen(): React.ReactElement {
         pos = await Location.getLastKnownPositionAsync();
       }
       if (!pos) pos = await Location.getLastKnownPositionAsync();
-      if (pos) flyTo(pos.coords.latitude, pos.coords.longitude, 16);
+      if (pos) {
+        userCoordsRef.current = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        };
+        webMapRef.current?.setUserLocation(
+          pos.coords.latitude,
+          pos.coords.longitude,
+        );
+        flyTo(pos.coords.latitude, pos.coords.longitude, 16);
+      }
     } catch {
       // ignore — user can still pan manually
     }
@@ -372,64 +353,42 @@ export default function DeliveryPickerScreen(): React.ReactElement {
         `Lat ${selectedSpot.lat.toFixed(5)}, Lng ${selectedSpot.lng.toFixed(5)}`)
     : null;
 
-  // Keep the live ref in lockstep with the camera. onCameraChanged fires on
-  // every frame of pan/zoom/animation — cheap, no React state churn.
-  const onCameraChanged = (state: MapState) => {
-    const [lng, lat] = state.properties.center as [number, number];
-    liveCenterRef.current = { lat, lng };
-    if (!moving) setMoving(true);
-  };
+  // Keep the live ref in lockstep with the map centre. onMove fires (throttled
+  // to one per animation frame) while the user drags — cheap, no React state
+  // churn beyond the `moving` flag.
+  const onWebMove = useCallback(
+    (lat: number, lng: number) => {
+      liveCenterRef.current = { lat, lng };
+      if (!moving) setMoving(true);
+    },
+    [moving],
+  );
 
-  const onMapIdle = (state: MapState) => {
-    setMoving(false);
-    const [lng, lat] = state.properties.center as [number, number];
-    liveCenterRef.current = { lat, lng };
-    if (
-      Math.abs(lat - center.lat) < 1e-6 &&
-      Math.abs(lng - center.lng) < 1e-6
-    ) {
-      return;
-    }
-    setCenter({ lat, lng });
-  };
+  const onWebIdle = useCallback(
+    (lat: number, lng: number) => {
+      setMoving(false);
+      liveCenterRef.current = { lat, lng };
+      if (
+        Math.abs(lat - center.lat) < 1e-6 &&
+        Math.abs(lng - center.lng) < 1e-6
+      ) {
+        return;
+      }
+      setCenter({ lat, lng });
+    },
+    [center.lat, center.lng],
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
-      {mapReady && permResolved ? (
-        <MapView
-          style={{ flex: 1 }}
-          styleURL={MAPBOX_STYLE_STREETS}
-          compassEnabled={false}
-          attributionPosition={{ bottom: 120, right: 8 }}
-          logoPosition={{ bottom: 120, left: 8 }}
-          scaleBarEnabled={false}
-          onDidFinishLoadingMap={() => setMapLoaded(true)}
-          onCameraChanged={onCameraChanged}
-          onMapIdle={onMapIdle}
-        >
-          <Camera
-            ref={cameraRef as never}
-            defaultSettings={{
-              centerCoordinate: [initialCoords.lng, initialCoords.lat],
-              zoomLevel: 15,
-            }}
-          />
-          {locationGranted ? (
-            <LocationPuck visible pulsing={{ isEnabled: true }} />
-          ) : null}
-        </MapView>
-      ) : (
-        <View
-          style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: colors.ink,
-          }}
-        >
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      )}
+      <WebMapPicker
+        ref={webMapRef}
+        initialCenter={initialCoords}
+        initialZoom={15}
+        onReady={handleMapReady}
+        onMove={onWebMove}
+        onIdle={onWebIdle}
+      />
 
       {/* Fixed centre pin */}
       <View

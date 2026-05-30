@@ -122,11 +122,33 @@ export default function DriverHomeScreen(): React.ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const recenterOnUser = (): void => {
-    if (!userCoords) return;
+  const recenterOnUser = async (): Promise<void> => {
     Haptics.selectionAsync().catch(() => {});
+    // Prefer the live puck coordinate; if the UserLocation puck hasn't emitted a
+    // fix yet (so userCoords is still null), fetch one on demand instead of
+    // silently doing nothing.
+    let coords = userCoords;
+    if (!coords) {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === "granted") {
+          const pos =
+            (await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            }).catch(() => null)) ??
+            (await Location.getLastKnownPositionAsync().catch(() => null));
+          if (pos) {
+            coords = [pos.coords.longitude, pos.coords.latitude];
+            setUserCoords(coords);
+          }
+        }
+      } catch {
+        // ignore — nothing to recenter on
+      }
+    }
+    if (!coords) return;
     cameraRef.current?.setCamera({
-      centerCoordinate: userCoords,
+      centerCoordinate: coords,
       zoomLevel: 15.5,
       animationDuration: 600,
     });
