@@ -1,5 +1,5 @@
 diff --git a/node_modules/@badatgil/expo-mapbox-navigation/ios/ExpoMapboxNavigationView.swift b/node_modules/@badatgil/expo-mapbox-navigation/ios/ExpoMapboxNavigationView.swift
-index 8f841df..3063fd5 100644
+index 8f841df..c9357d0 100644
 --- a/node_modules/@badatgil/expo-mapbox-navigation/ios/ExpoMapboxNavigationView.swift
 +++ b/node_modules/@badatgil/expo-mapbox-navigation/ios/ExpoMapboxNavigationView.swift
 @@ -40,7 +40,7 @@ class ExpoMapboxNavigationView: ExpoView {
@@ -11,3 +11,49 @@ index 8f841df..3063fd5 100644
      var mapboxNavigation: MapboxNavigation? = nil
      var routingProvider: RoutingProvider? = nil
      var navigation: NavigationController? = nil
+@@ -322,14 +322,24 @@ class ExpoMapboxNavigationViewController: UIViewController {
+     }
+ 
+     func calculateRoutes(waypoints: Array<Waypoint>){
++        // Only send these query items when they actually carry a value. An empty
++        // `exclude=` (or `max_height=0.0`/`max_width=0.0`) makes the Mapbox
++        // Directions API reject the request with 422 InvalidInput, which surfaces
++        // as "Itinéraire indisponible" on every route.
++        var routeQueryItems: [URLQueryItem] = []
++        if let excludeList = currentRouteExcludeList, !excludeList.isEmpty {
++            routeQueryItems.append(URLQueryItem(name: "exclude", value: excludeList.joined(separator: ",")))
++        }
++        if let maxHeight = vehicleMaxHeight, maxHeight > 0 {
++            routeQueryItems.append(URLQueryItem(name: "max_height", value: String(format: "%.1f", maxHeight)))
++        }
++        if let maxWidth = vehicleMaxWidth, maxWidth > 0 {
++            routeQueryItems.append(URLQueryItem(name: "max_width", value: String(format: "%.1f", maxWidth)))
++        }
+         let routeOptions = NavigationRouteOptions(
+             waypoints: waypoints,
+             profileIdentifier: currentRouteProfile != nil ? ProfileIdentifier(rawValue: currentRouteProfile!) : nil,
+-            queryItems: [
+-                URLQueryItem(name: "exclude", value: currentRouteExcludeList?.joined(separator: ",")),
+-                URLQueryItem(name: "max_height", value: String(format: "%.1f", vehicleMaxHeight ?? 0.0)),
+-                URLQueryItem(name: "max_width", value: String(format: "%.1f", vehicleMaxWidth ?? 0.0))
+-            ],
++            queryItems: routeQueryItems,
+             locale: currentLocale,
+             distanceUnit: currentLocale.usesMetricSystem ? LengthFormatter.Unit.meter : LengthFormatter.Unit.mile
+         )
+@@ -348,10 +358,14 @@ class ExpoMapboxNavigationViewController: UIViewController {
+     }
+ 
+     func calculateMapMatchingRoutes(waypoints: Array<Waypoint>){
++        var matchQueryItems: [URLQueryItem] = []
++        if let excludeList = currentRouteExcludeList, !excludeList.isEmpty {
++            matchQueryItems.append(URLQueryItem(name: "exclude", value: excludeList.joined(separator: ",")))
++        }
+         let matchOptions = NavigationMatchOptions(
+             waypoints: waypoints,
+             profileIdentifier: currentRouteProfile != nil ? ProfileIdentifier(rawValue: currentRouteProfile!) : nil,
+-            queryItems: [URLQueryItem(name: "exclude", value: currentRouteExcludeList?.joined(separator: ","))],
++            queryItems: matchQueryItems,
+             distanceUnit: currentLocale.usesMetricSystem ? LengthFormatter.Unit.meter : LengthFormatter.Unit.mile
+         )
+         matchOptions.locale = currentLocale
