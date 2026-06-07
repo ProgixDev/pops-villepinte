@@ -23,6 +23,8 @@ import { UpdateHomeContentDto } from './dto/update-home-content.dto';
 import { UpdateShopSettingsDto } from './dto/update-shop-settings.dto';
 import { CreateAccompagnementDto } from './dto/create-accompagnement.dto';
 import { UpdateAccompagnementDto } from './dto/update-accompagnement.dto';
+import { CreatePopupDto } from './dto/create-popup.dto';
+import { UpdatePopupDto } from './dto/update-popup.dto';
 import { ACCOMPAGNEMENT_SELECT } from '../accompagnements/accompagnements.service';
 
 @Injectable()
@@ -569,6 +571,79 @@ export class AdminCatalogueService {
       .delete()
       .eq('id', id);
 
+    if (error) throw error;
+    return { deleted: true };
+  }
+
+  // Opening pop-ups (posters). Multiple per app, optionally targeted at
+  // loyalty tiers; surfaced on the mobile home screen.
+  private static readonly POPUP_SELECT =
+    'id, title, image_url, target_tiers, is_active, sort_order, created_at, updated_at';
+
+  async listPopups() {
+    const { data, error } = await this.supabase
+      .from('app_popups')
+      .select(AdminCatalogueService.POPUP_SELECT)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  }
+
+  async createPopup(dto: CreatePopupDto) {
+    const { data, error } = await this.supabase
+      .from('app_popups')
+      .insert({
+        title: dto.title ?? '',
+        image_url: dto.image_url,
+        target_tiers: dto.target_tiers ?? [],
+        is_active: dto.is_active ?? true,
+        sort_order: dto.sort_order ?? 0,
+      })
+      .select(AdminCatalogueService.POPUP_SELECT)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async updatePopup(id: string, dto: UpdatePopupDto) {
+    const patch: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (dto.title !== undefined) patch.title = dto.title;
+    if (dto.image_url !== undefined) patch.image_url = dto.image_url;
+    if (dto.target_tiers !== undefined) patch.target_tiers = dto.target_tiers;
+    if (dto.is_active !== undefined) patch.is_active = dto.is_active;
+    if (dto.sort_order !== undefined) patch.sort_order = dto.sort_order;
+
+    const { data, error } = await this.supabase
+      .from('app_popups')
+      .update(patch)
+      .eq('id', id)
+      .select(AdminCatalogueService.POPUP_SELECT)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new NotFoundException('Pop-up not found');
+    return data;
+  }
+
+  async deletePopup(id: string) {
+    // Best-effort cleanup of the poster image; the row delete is authoritative.
+    const { data: existing } = await this.supabase
+      .from('app_popups')
+      .select('image_url')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (existing?.image_url) {
+      const key = this.extractStorageKey(existing.image_url, 'popups');
+      if (key) await this.supabase.storage.from('popups').remove([key]);
+    }
+
+    const { error } = await this.supabase
+      .from('app_popups')
+      .delete()
+      .eq('id', id);
     if (error) throw error;
     return { deleted: true };
   }

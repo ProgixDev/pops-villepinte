@@ -144,6 +144,18 @@ export const menuApi = {
     api<Accompagnement[]>("/accompagnements"),
   getShopSettings: () => api<ShopSettings>("/menu/shop-settings"),
   getHomeContent: () => api<HomeContent>("/menu/home-content"),
+  // Opening pop-ups (posters). Pass the client's loyalty tier so the server
+  // returns the "everyone" posters plus those targeted at that tier.
+  getPopups: (tier?: string) =>
+    api<Popup[]>("/menu/popups", { params: tier ? { tier } : undefined }),
+};
+
+export type Popup = {
+  id: string;
+  title: string;
+  image_url: string;
+  target_tiers: string[];
+  sort_order: number;
 };
 
 export type HomeContent = {

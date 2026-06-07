@@ -26,6 +26,8 @@ import { UpdateHomeContentDto } from './dto/update-home-content.dto';
 import { UpdateShopSettingsDto } from './dto/update-shop-settings.dto';
 import { CreateAccompagnementDto } from './dto/create-accompagnement.dto';
 import { UpdateAccompagnementDto } from './dto/update-accompagnement.dto';
+import { CreatePopupDto } from './dto/create-popup.dto';
+import { UpdatePopupDto } from './dto/update-popup.dto';
 
 @Controller('admin')
 @UseGuards(AdminGuard)
@@ -201,5 +203,26 @@ export class AdminCatalogueController {
   @Delete('accompagnements/:id')
   deleteAccompagnement(@Param('id') id: string) {
     return this.catalogueService.deleteAccompagnement(id);
+  }
+
+  // Opening pop-ups (posters shown on the mobile home screen)
+  @Get('popups')
+  listPopups() {
+    return this.catalogueService.listPopups();
+  }
+
+  @Post('popups')
+  createPopup(@Body() dto: CreatePopupDto) {
+    return this.catalogueService.createPopup(dto);
+  }
+
+  @Patch('popups/:id')
+  updatePopup(@Param('id') id: string, @Body() dto: UpdatePopupDto) {
+    return this.catalogueService.updatePopup(id, dto);
+  }
+
+  @Delete('popups/:id')
+  deletePopup(@Param('id') id: string) {
+    return this.catalogueService.deletePopup(id);
   }
 }

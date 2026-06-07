@@ -19,6 +19,7 @@ import { ArrowRight, Bell, Heart } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
 import FloatingCartBar from "@/components/cart/FloatingCartBar";
+import PopupOverlay from "@/components/home/PopupOverlay";
 import {
   SkeletonHeroSlide,
   SkeletonTopPickCard,
@@ -789,6 +790,7 @@ export default function AccueilScreen(): React.ReactElement {
       </View>
       </>
       ) : null}
+      <PopupOverlay />
     </Screen>
   );
 }

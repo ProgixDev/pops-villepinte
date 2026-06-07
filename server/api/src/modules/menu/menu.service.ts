@@ -118,4 +118,23 @@ export class MenuService {
     if (error) throw error;
     return data;
   }
+
+  // Active opening pop-ups for a given loyalty tier. A poster with an empty
+  // `target_tiers` is shown to everyone; otherwise only when `tier` matches.
+  // When `tier` is omitted (guest / unknown) only the "everyone" posters show.
+  async getPopups(tier?: string) {
+    const { data, error } = await this.supabase
+      .from('app_popups')
+      .select('id, title, image_url, target_tiers, sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    const rows = data ?? [];
+    return rows.filter((r) => {
+      const tiers: string[] = r.target_tiers ?? [];
+      if (tiers.length === 0) return true;
+      return tier ? tiers.includes(tier) : false;
+    });
+  }
 }

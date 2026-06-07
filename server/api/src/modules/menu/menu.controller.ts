@@ -48,4 +48,10 @@ export class MenuController {
   getHomeContent() {
     return this.menuService.getHomeContent();
   }
+
+  // Opening pop-ups (posters). Pass `tier` to receive tier-targeted posters.
+  @Get('popups')
+  getPopups(@Query('tier') tier?: string) {
+    return this.menuService.getPopups(tier);
+  }
 }
