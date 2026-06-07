@@ -9,17 +9,18 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.progix.popsvillepinte",
-      "buildNumber": "11",
+      "buildNumber": "15",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "POP'S utilise ta position pour suggérer ton adresse de livraison et te montrer la carte."
-      }
+      },
+      "appleTeamId": "89884BGNZR"
     },
     "android": {
       "package": "com.progix.popsvillepinte",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 11,
+      "versionCode": 15,
       "adaptiveIcon": {
         "backgroundColor": "#FFCE00",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -76,7 +77,7 @@
       [
         "@badatgil/expo-mapbox-navigation",
         {
-          "accessToken": "pk.your_public_token_here",
+          "accessToken": "pk.eyJ1IjoibW9oYW1lZGJ6YSIsImEiOiJjbXAyM3NtazkwY2VzMnNxeXp0MWdqZnhpIn0.atkw_dqMmBEGIts_WbUrcA",
           "mapboxMapsVersion": "11.11.0"
         }
       ],
