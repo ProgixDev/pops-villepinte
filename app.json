@@ -8,17 +8,18 @@
     "scheme": "pops",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.progix.popsvillepinte",
+      "bundleIdentifier": "com.progix.pops",
       "buildNumber": "15",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "POP'S utilise ta position pour suggérer ton adresse de livraison et te montrer la carte."
+        "NSLocationWhenInUseUsageDescription": "POP'S utilise ta position pour suggérer ton adresse de livraison et te montrer la carte.",
+        "MBXAccessToken": "pk.eyJ1IjoibW9oYW1lZGJ6YSIsImEiOiJjbXAyM3NtazkwY2VzMnNxeXp0MWdqZnhpIn0.atkw_dqMmBEGIts_WbUrcA"
       },
-      "appleTeamId": "89884BGNZR"
+      "appleTeamId": "67T74DPM8N"
     },
     "android": {
-      "package": "com.progix.popsvillepinte",
+      "package": "com.progix.pops",
       "googleServicesFile": "./google-services.json",
       "versionCode": 15,
       "adaptiveIcon": {
@@ -30,7 +31,11 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -89,7 +94,8 @@
           },
           "ios": {
             "deploymentTarget": "15.1",
-            "useFrameworks": "static"
+            "useFrameworks": "static",
+            "buildReactNativeFromSource": true
           }
         }
       ],
@@ -110,6 +116,12 @@
         "projectId": "78ec6494-6b77-4cca-b9ef-31882f867f5f"
       }
     },
-    "owner": "mohameddev7"
+    "owner": "mohameddev7",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/78ec6494-6b77-4cca-b9ef-31882f867f5f"
+    }
   }
 }

@@ -4,6 +4,9 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { setCurrentAccessToken, supabase } from "@/lib/supabase";
 
 import { useFavoritesStore } from "./favorites.store";
+import { useDeliveriesStore } from "./driver/deliveries.store";
+import { useDriverProfileStore } from "./driver/profile.store";
+import { useEarningsStore } from "./driver/earnings.store";
 import { asyncStorageAdapter } from "./_storage";
 
 // Strip any trailing slash so a `.../api/v1/` base + `/path` doesn't become a
@@ -295,6 +298,11 @@ export const useAuthStore = create<AuthState>()(
         await supabase.auth.signOut();
         setCurrentAccessToken(null);
         useFavoritesStore.getState().clear();
+        // Wipe driver state too, so a second driver signing in on the same
+        // device never sees the previous driver's courses, profile or earnings.
+        useDeliveriesStore.getState().reset();
+        useDriverProfileStore.getState().reset();
+        useEarningsStore.getState().reset();
         set({
           authed: false,
           signupDone: false,

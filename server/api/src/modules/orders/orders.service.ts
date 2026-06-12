@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -47,6 +48,8 @@ const ADMIN_ORDER_SELECT = `
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @Inject(SUPABASE_ADMIN) private readonly supabase: SupabaseClient,
     private readonly gateway: OrdersGateway,
@@ -684,6 +687,26 @@ export class OrdersService {
       .single();
 
     if (error) throw error;
+
+    // Keep the driver's assignment in sync with a cancellation. The assignment
+    // lives in a separate table, so without this an order cancelled by the
+    // customer/admin would leave any in-flight (pending/accepted) assignment
+    // untouched and the driver would keep seeing the course as "en cours".
+    // Flipping it to 'cancelled' here also trips the driver's realtime channel
+    // (it's subscribed to order_assignments), so the course drops off their
+    // screen instantly. Best-effort: the order cancel itself already succeeded.
+    if (status === 'cancelled') {
+      const { error: assignErr } = await this.supabase
+        .from('order_assignments')
+        .update({ status: 'cancelled' })
+        .eq('order_id', orderId)
+        .in('status', ['pending', 'accepted']);
+      if (assignErr) {
+        this.logger.warn(
+          `Failed to cancel assignments for order ${orderId}: ${assignErr.message}`,
+        );
+      }
+    }
 
     const eventType =
       status === 'cancelled' ? 'order:cancelled' : 'order:status_changed';

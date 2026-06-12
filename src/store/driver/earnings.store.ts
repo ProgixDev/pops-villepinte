@@ -18,6 +18,7 @@ type EarningsState = {
   loading: boolean;
   fetchAll: () => Promise<void>;
   addOnlineMinutes: (min: number) => void;
+  reset: () => void;
 };
 
 const empty: EarningsBucket = { amountEUR: 0, deliveries: 0 };
@@ -60,4 +61,9 @@ export const useEarningsStore = create<EarningsState>()((set) => ({
   addOnlineMinutes: (min) => {
     set((s) => ({ hoursOnlineToday: s.hoursOnlineToday + min / 60 }));
   },
+
+  // Clear on logout so the next driver doesn't see the previous driver's
+  // earnings totals before their own fetch resolves.
+  reset: () =>
+    set({ today: empty, week: empty, month: empty, hoursOnlineToday: 0, loading: false }),
 }));

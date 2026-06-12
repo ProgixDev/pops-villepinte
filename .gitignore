@@ -45,3 +45,11 @@ app-example
 
 
 test_creds.txt
+
+# signing / push secrets — never commit
+pops_keys/
+*.p8
+*-firebase-adminsdk-*.json
+
+# standalone marketing / acquisition site (separate project)
+/acquisition-site

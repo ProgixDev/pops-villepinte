@@ -10,6 +10,7 @@ type DriverProfileState = {
   fetch: () => Promise<void>;
   toggleOnline: () => Promise<void>;
   setOnline: (online: boolean) => Promise<void>;
+  reset: () => void;
 };
 
 const defaultProfile: DriverProfileView = {
@@ -64,4 +65,8 @@ export const useDriverProfileStore = create<DriverProfileState>()((set, get) => 
       set({ online: !online }); // rollback
     }
   },
+
+  // Clear on logout so the next driver doesn't briefly see the previous
+  // driver's name/phone/online flag before their own fetch() resolves.
+  reset: () => set({ profile: defaultProfile, online: false, loading: false }),
 }));

@@ -64,6 +64,19 @@ export default function DriverAssignmentScreen(): React.ReactElement {
   const respond = useCallback(
     async (status: "accepted" | "refused") => {
       if (!id) return;
+      // One delivery at a time. If the driver already has a course in flight,
+      // block accepting a second one here for instant feedback — the server
+      // enforces the same rule as the source of truth (see drivers-me.respond).
+      if (status === "accepted") {
+        const active = useDeliveriesStore.getState().activeId;
+        if (active && active !== id) {
+          Alert.alert(
+            "Livraison déjà en cours",
+            "Termine ta course actuelle avant d'en accepter une nouvelle.",
+          );
+          return;
+        }
+      }
       try {
         setResponding(status);
         const updated = await driverApi.respond(id, status, note);

@@ -25,6 +25,7 @@ type DeliveriesState = {
     id: string,
     payload: { category: string; description?: string },
   ) => Promise<void>;
+  reset: () => void;
 };
 
 function activeIdFromList(items: Delivery[]): string | null {
@@ -72,8 +73,14 @@ export const useDeliveriesStore = create<DeliveriesState>()((set, get) => ({
     const mapped = mapAssignmentToDelivery(updated);
     set((s) => {
       const nextById = { ...s.byId, [id]: mapped };
-      const nextActive = activeIdFromList(Object.values(nextById));
-      return { byId: nextById, activeId: nextActive };
+      // Re-derive active from the fetch ordering (s.order), NOT Object.values:
+      // map insertion order isn't assigned_at order, so picking inflight[0]
+      // from unordered values could point the "En cours" card at the wrong
+      // course after interleaved responds/refetches.
+      const ordered = s.order
+        .map((oid) => nextById[oid])
+        .filter((d): d is Delivery => d !== undefined);
+      return { byId: nextById, activeId: activeIdFromList(ordered) };
     });
   },
 
@@ -107,6 +114,10 @@ export const useDeliveriesStore = create<DeliveriesState>()((set, get) => ({
     // admin reassigning it) shows up.
     await get().fetch();
   },
+
+  // Wipe all delivery state. Called on logout so the next driver to sign in on
+  // this device never sees the previous driver's courses / active card.
+  reset: () => set({ byId: {}, order: [], activeId: null, loading: false, error: null }),
 }));
 
 export function selectActiveDelivery(s: DeliveriesState): Delivery | null {

@@ -9,17 +9,34 @@
       "distribution": "internal",
       "ios": {
         "simulator": true
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "ios": {
         "autoIncrement": true
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "autoIncrement": true
+      },
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6778856901",
+        "ascApiKeyPath": "./pops_keys/AuthKey_8R6NTMF7YD.p8",
+        "ascApiKeyId": "8R6NTMF7YD",
+        "ascApiKeyIssuerId": "b94d9e9f-979c-4c21-b869-c45ddb50b429"
       }
     }
   }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   InteractionManager,
   Pressable,
@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useShallow } from "zustand/react/shallow";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -98,6 +98,17 @@ export default function DriverHomeScreen(): React.ReactElement {
   // to those effects' deps so they replay once the map is actually live (which
   // also covers the case where `active` resolves before the map mounts).
   const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Re-pull deliveries every time the home tab regains focus. The realtime
+  // channel (driver/_layout) covers live assignment changes, but a refetch on
+  // focus is a cheap, reliable backstop — it's how a course cancelled while the
+  // driver was on another screen (or while a realtime event was missed) drops
+  // out of "en cours" the moment they come back to the home screen.
+  useFocusEffect(
+    useCallback(() => {
+      void fetchDeliveries();
+    }, [fetchDeliveries]),
+  );
 
   useEffect(() => {
     void fetchProfile();

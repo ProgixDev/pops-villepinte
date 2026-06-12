@@ -4,6 +4,7 @@ import {
   Alert,
   InteractionManager,
   Linking,
+  Platform,
   Pressable,
   Text,
   View,
@@ -15,6 +16,7 @@ import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 
 import { colors, shadow } from "@/constants/theme";
+import { useDriverLocationBroadcast } from "@/lib/driver/useDriverLocationBroadcast";
 import { STORE_LAT, STORE_LNG } from "@/lib/delivery";
 import { formatDistanceMeters, formatDurationMinutes } from "@/lib/format";
 import { useDeliveriesStore } from "@/store/driver/deliveries.store";
@@ -22,6 +24,19 @@ import { useMenuStore } from "@/store/menu.store";
 import type { LngLat } from "@/types/driver";
 
 const MAPBOX_PUBLIC_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_PUBLIC_TOKEN ?? "";
+
+// Routing profile passed to @badatgil/expo-mapbox-navigation. The native bridge
+// turns this straight into a Mapbox routing profile identifier, and the two
+// platforms expect DIFFERENT formats: iOS needs the namespaced
+// `mapbox/driving-traffic` (it builds `ProfileIdentifier(rawValue:)` verbatim),
+// while Android needs the bare `driving-traffic` (no `mapbox/` prefix). Passing
+// the Android format on iOS yields an invalid profile, the router returns no
+// route, and the SDK surfaces DirectionsError.noData — "The server returned an
+// empty response" / "Itinéraire indisponible". See the module README.
+const ROUTE_PROFILE = Platform.select({
+  ios: "mapbox/driving-traffic",
+  default: "driving-traffic",
+});
 
 // If we can't get a GPS fix (simulator, denied permission), fall back to the
 // storefront — the driver starts there anyway in the parked-at-restaurant model.
@@ -86,6 +101,28 @@ export default function DriverNavigateScreen(): React.ReactElement {
     if (id && !delivery) void fetchDeliveries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // If the course is cancelled out from under the driver mid-navigation
+  // (customer/admin cancellation, propagated here via the realtime refetch in
+  // driver/_layout), don't strand them on a dead turn-by-turn screen — tell
+  // them once and send them back. The delivered handoff has its own path (the
+  // scan screen) and sets status to "delivered", so this only fires on a real
+  // cancellation.
+  // Broadcast GPS to driver_locations while en route so the customer's live
+  // map updates. The accept flow router.replace's straight here (bypassing the
+  // delivery detail screen, the only other broadcaster), so without this the
+  // customer-facing live map would get no updates in the primary flow.
+  useDriverLocationBroadcast({ active: delivery?.status === "accepted" });
+
+  const cancelled = delivery?.status === "cancelled";
+  useEffect(() => {
+    if (!cancelled) return;
+    Alert.alert(
+      "Course annulée",
+      "Cette commande a été annulée. Tu peux reprendre une nouvelle course.",
+      [{ text: "OK", onPress: () => router.back() }],
+    );
+  }, [cancelled, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,7 +251,7 @@ export default function DriverNavigateScreen(): React.ReactElement {
             latitude: origin[1],
             zoom: 15,
           }}
-          routeProfile="driving-traffic"
+          routeProfile={ROUTE_PROFILE}
           locale="fr"
           mute={muted}
           onRouteProgressChanged={(e) => setProgress(e.nativeEvent)}

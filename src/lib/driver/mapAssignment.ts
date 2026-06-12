@@ -1,14 +1,17 @@
 import type { DriverAssignment } from "@/lib/api";
+import { STORE_LAT, STORE_LNG } from "@/lib/delivery";
 import type { Delivery, DeliveryAddress, DeliveryStatus } from "@/types/driver";
 
 // Pickup is always POP'S Villepinte. The store address rarely changes; if it
-// ever does, surface it through shop_settings and read here.
+// ever does, surface it through shop_settings and read here. Coordinates come
+// from the single store constant (@/lib/delivery) so the home-map pin and this
+// route origin can never drift apart.
 const POPS_VILLEPINTE_PICKUP: DeliveryAddress = {
   label: "POP'S Villepinte",
   line1: "ZAC du Sausset",
   city: "Villepinte",
   postalCode: "93420",
-  coordinates: [2.5392, 48.9695],
+  coordinates: [STORE_LNG, STORE_LAT],
 };
 
 function shortCodeFromOrderId(orderId: string): string {
@@ -19,11 +22,16 @@ function shortCodeFromOrderId(orderId: string): string {
 }
 
 function deriveStatus(a: DriverAssignment): DeliveryStatus {
+  // The order's own status overrides the assignment. If the customer or admin
+  // cancelled the order, the assignment row may still read "accepted" (it's a
+  // separate table), but there's nothing left to deliver — never show it as
+  // "en cours". 'picked_up' is the terminal delivered state on the order side.
+  if (a.orders?.status === "cancelled") return "cancelled";
   if (a.status === "refused" || a.status === "cancelled") return "cancelled";
   if (a.status === "pending") return "assigned";
   // accepted — the driver is parked at the restaurant, so accepting already
   // means en route to the customer. There's no separate "picked up" state.
-  if (a.delivered_at) return "delivered";
+  if (a.delivered_at || a.orders?.status === "picked_up") return "delivered";
   return "accepted";
 }
 

@@ -129,6 +129,28 @@ export class DriversMeService {
       );
     }
 
+    // One delivery at a time. Before accepting, make sure the driver has no
+    // other in-flight course — an assignment is in flight while it's 'accepted'
+    // and not yet delivered (delivered_at null). Cancelled/refused/delivered
+    // assignments don't count, so a driver who just finished is free to take
+    // the next one.
+    if (status === 'accepted') {
+      const { data: inflight, error: inflightErr } = await this.supabase
+        .from('order_assignments')
+        .select('id')
+        .eq('driver_id', driverId)
+        .eq('status', 'accepted')
+        .is('delivered_at', null)
+        .neq('id', assignmentId)
+        .limit(1);
+      if (inflightErr) throw inflightErr;
+      if (inflight && inflight.length > 0) {
+        throw new BadRequestException(
+          'Tu as déjà une livraison en cours. Termine-la avant d\'en accepter une nouvelle.',
+        );
+      }
+    }
+
     // Accepting collapses the old separate "picked up" step. The driver is
     // parked at the restaurant, so accepting the course IS taking the food: we
     // stamp picked_up_at now and advance the order to handed_to_livreur, which

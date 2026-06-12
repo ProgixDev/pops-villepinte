@@ -3,6 +3,7 @@ import { useEffect } from "react";
 
 import { supabase } from "@/lib/supabase";
 import { useDeliveriesStore } from "@/store/driver/deliveries.store";
+import { useDriverProfileStore } from "@/store/driver/profile.store";
 
 export default function DriverLayout(): React.ReactNode {
   const router = useRouter();
@@ -34,10 +35,15 @@ export default function DriverLayout(): React.ReactNode {
             // UI reflects it immediately.
             void useDeliveriesStore.getState().fetch();
             // A brand-new pending assignment → jump straight to the accept/
-            // refuse sheet, same destination as tapping the push.
+            // refuse sheet, same destination as tapping the push. Only when the
+            // driver is actually online: an offline driver still receives the
+            // realtime row (RLS isn't gated on is_active, unlike the push), but
+            // the offline contract means we must not yank them into a course.
+            // The list refresh above keeps it visible for when they're back on.
             if (payload.eventType === "INSERT") {
               const row = payload.new as { id: string; status: string };
-              if (row.status === "pending") {
+              const online = useDriverProfileStore.getState().online;
+              if (row.status === "pending" && online) {
                 router.push(`/driver/assignment/${row.id}` as never);
               }
             }
